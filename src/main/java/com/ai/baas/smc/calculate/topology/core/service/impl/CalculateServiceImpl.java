@@ -1,5 +1,7 @@
 package com.ai.baas.smc.calculate.topology.core.service.impl;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -8,6 +10,7 @@ import com.ai.baas.dshm.client.CacheFactoryUtil;
 import com.ai.baas.dshm.client.impl.DshmClient;
 import com.ai.baas.dshm.client.interfaces.IDshmClient;
 import com.ai.baas.smc.api.policymanage.interfaces.IPolicyManageSV;
+import com.ai.baas.smc.api.policymanage.param.PolicyDetailQueryConditionInfo;
 import com.ai.baas.smc.api.policymanage.param.PolicyDetailQueryItemInfo;
 import com.ai.baas.smc.api.policymanage.param.PolicyDetailQueryRequest;
 import com.ai.baas.smc.api.policymanage.param.PolicyDetailQueryResponse;
@@ -77,7 +80,43 @@ public class CalculateServiceImpl implements ICalculateService {
 	@Override
 	public boolean matchPolicy(String[] stream, List paramList, List<PolicyDetailQueryItemInfo> policyItemList) {
 		// TODO Auto-generated method stub
-		return false;
+		List valueList=valueList(stream,paramList);
+		for(PolicyDetailQueryItemInfo policyDetailQueryItemInfo:policyItemList)
+		{
+		 List<PolicyDetailQueryConditionInfo> policyConditionList=policyDetailQueryItemInfo.getPolicyDetailQueryConditionInfos();
+		 for(PolicyDetailQueryConditionInfo policyDetailQueryConditionInfo:policyConditionList)
+		 {
+//			if()
+//			{
+//				return false;
+//			}
+		 }
+		}
+		
+		return true;
 	}
+	
+	
+	
+	public List valueList(String [] stream,List paramList)
+	{
+		List<Map<String,String>> valueList=new ArrayList<Map<String,String>>();
+		for(int i=0;i<stream.length;i++)
+		{
+			Map map=new HashMap();
+			for(int j=0;j<paramList.size();j++)
+			{
+				Map paramMap=(Map) paramList.get(j);
+				if(paramMap.containsKey(i))
+				{
+					map.put(paramMap.get(i), stream[i])	;
+				}
+			}
+			valueList.add(map);
+		}
+		return valueList;
+		
+	}
+	
 
 }

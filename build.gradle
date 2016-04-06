@@ -30,6 +30,16 @@ dependencies{
     
     // 不打包依赖
     provided 'org.apache.storm:storm-core:0.9.6'
+    
+      compile 'com.ai.opt.sdk:opt-sdk:1.0-SNAPSHOT'
+      compile 'com.ai.baas.smc:policymanage:0.1-SNAPSHOT'
+      compile 'com.ai.baas:baas-dshm-sdk:1.0.5-SNAPSHOT'
+      compile 'org.wltea.expression:IKExpression:2.1.2'
+    
+    compile ('com.alibaba:dubbox:2.8.3'){
+		exclude group: 'org.springframework', module: 'spring'
+	}
+	
 }
 
 sourceSets {

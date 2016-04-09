@@ -52,7 +52,6 @@ public class UnpackingBolt extends BaseBasicBolt {
 			String[] inputDatas = StringUtils.splitPreserveAllTokens(line, BaseConstants.RECORD_SPLIT);
 			MessageParser messageParser = null;
 			for(String inputData:inputDatas){
-				//System.out.println("-------------"+inputData);
 				messageParser = MessageParser.parseObject(inputData, mappingRules, outputFields);
 				messageParser.getData();
 				values = messageParser.toTupleData();
@@ -60,10 +59,7 @@ public class UnpackingBolt extends BaseBasicBolt {
 					collector.emit(values);
 				}
 				
-				//test
-//				values = new ArrayList<Object>();
-//				values.add(inputData);
-//				collector.emit(values);
+			
 			}
 		}catch(Exception e){
 			e.printStackTrace();

@@ -6,9 +6,9 @@ package com.ai.baas.smc.calculate.topology.core.util;
  * @author zhangbc
  *
  */
-public class IKin {
+public  class IKin {
 
-	public boolean in(String a, String b) {
+	public static boolean in(String a, String b) {
 		if (b.startsWith("{")) {
 			b = b.substring(1, b.length() - 1);
 		}

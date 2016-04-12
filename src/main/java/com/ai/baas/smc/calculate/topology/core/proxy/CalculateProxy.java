@@ -183,22 +183,22 @@ public class CalculateProxy {
 		long sortId = elementSearchResponseVO.getSortId();
 		int num = (int) sortId;
 		String compare = stream[num];
-		if (planType.equals("nomal")) {
+		if (planType.equals("nomal")) {//标准型
 			double calValue=Double.parseDouble(policyDetailQueryPlanInfo.getNormalCalValue());
-			if(calType.equals("ratio"))
+			if(calType.equals("ratio"))//按比例
 			{
 				value=Double.parseDouble(compare)*calValue;	
 			}
-			else if(calType.equals("fixed"))
+			else if(calType.equals("fixed"))//固定值
 			{
 				value=calValue;
 			}
-			else if(calType.equals("price"))
+			else if(calType.equals("price"))//单价
 			{
 				value=Double.parseDouble(compare)*calValue;		
 			}
 			
-		} else if (planType.equals("step")) {
+		} else if (planType.equals("step")) {//阶梯
 			List<StepCalValue> list = policyDetailQueryPlanInfo.getStepCalValues();
 			String calValue = "";
 			for (StepCalValue stepCalValue : list) {
@@ -215,7 +215,7 @@ public class CalculateProxy {
 				}
 				
 			}
-		} else if ("switch".equals(planType)) {
+		} else if ("switch".equals(planType)) {//分档
 
 			List<StepCalValue> list = policyDetailQueryPlanInfo.getStepCalValues();
 			String calValue = "";
@@ -226,7 +226,6 @@ public class CalculateProxy {
 					calValue = stepCalValue.getCalValue();
 				}
 			}
-
 			if (calType.equals("ratio")) {
 				value = Double.parseDouble(compare) * Double.parseDouble(calValue);
 			} else if (calType.equals("fixed")) {

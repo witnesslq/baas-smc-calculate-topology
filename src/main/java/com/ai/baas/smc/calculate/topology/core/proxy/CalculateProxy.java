@@ -167,7 +167,6 @@ public class CalculateProxy {
 
 	/**
 	 * 算费
-	 * 
 	 * @param planType
 	 * @param calType
 	 * @return

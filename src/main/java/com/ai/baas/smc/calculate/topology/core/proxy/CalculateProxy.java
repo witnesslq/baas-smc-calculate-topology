@@ -14,19 +14,20 @@ import com.ai.baas.dshm.client.impl.DshmClient;
 import com.ai.baas.dshm.client.interfaces.IDshmClient;
 import com.ai.baas.smc.api.elementmanage.interfaces.IElementManageSV;
 import com.ai.baas.smc.api.elementmanage.param.ElementSearchResponseVO;
-import com.ai.baas.smc.api.policymanage.interfaces.IPolicyManageSV;
-import com.ai.baas.smc.api.policymanage.param.PolicyDetailQueryConditionInfo;
 import com.ai.baas.smc.api.policymanage.param.PolicyDetailQueryItemInfo;
 import com.ai.baas.smc.api.policymanage.param.PolicyDetailQueryPlanInfo;
-import com.ai.baas.smc.api.policymanage.param.PolicyDetailQueryRequest;
-import com.ai.baas.smc.api.policymanage.param.PolicyDetailQueryResponse;
-import com.ai.baas.smc.api.policymanage.param.PolicyListQueryRequest;
-import com.ai.baas.smc.api.policymanage.param.PolicyListQueryResponse;
 import com.ai.baas.smc.api.policymanage.param.StepCalValue;
+import com.ai.baas.smc.calculate.topology.core.bo.StlPolicy;
+import com.ai.baas.smc.calculate.topology.core.bo.StlPolicyItemCondition;
+import com.ai.baas.smc.calculate.topology.core.bo.StlPolicyItemPlan;
 import com.ai.baas.smc.calculate.topology.core.util.CacheBLMapper;
 import com.ai.baas.smc.calculate.topology.core.util.IKin;
+import com.ai.baas.smc.calculate.topology.core.util.SmcCacheConstant;
+import com.ai.opt.sdk.cache.factory.CacheClientFactory;
 import com.ai.opt.sdk.util.DubboConsumerFactory;
 import com.ai.paas.ipaas.mcs.interfaces.ICacheClient;
+import com.alibaba.dubbo.common.json.ParseException;
+import com.alibaba.fastjson.JSON;
 
 /**
  * 
@@ -34,6 +35,15 @@ import com.ai.paas.ipaas.mcs.interfaces.ICacheClient;
  *
  */
 public class CalculateProxy {
+	
+	
+	public String cal(String[] stream)
+	{
+		
+		
+		
+		return null;
+	}
 
 	/**
 	 * 根据对象类型获取该对象下有效政策
@@ -41,58 +51,83 @@ public class CalculateProxy {
 	 * @param objectId
 	 * @param tenantId
 	 * @return
+	 * @throws ParseException 
 	 */
-	public List getPolicyList(String objectId, String tenantId) {
+	public List<StlPolicy> getPolicyList(String objectId, String tenantId) throws ParseException {
 		// TODO Auto-generated method stub
-		IPolicyManageSV policyManageSV = DubboConsumerFactory.getService(IPolicyManageSV.class);
-		PolicyListQueryRequest policyListQueryRequest = new PolicyListQueryRequest();
-		policyListQueryRequest.setTenantId(tenantId);
-		policyListQueryRequest.setDataObjectId(objectId);
-		PolicyListQueryResponse response = policyManageSV.queryPolicyList(policyListQueryRequest);
-		List list = response.getPageInfo().getResult();
-		return list;
+		ICacheClient cacheClient = CacheClientFactory
+                .getCacheClient(SmcCacheConstant.NameSpace.POLICY_CACHE);
+		String policyAll=cacheClient.get(SmcCacheConstant.POLICY_ALL);
+		List<StlPolicy> stlPolicyList=new ArrayList<StlPolicy>();
+		List<StlPolicy> policyList=JSON.parseArray(policyAll, StlPolicy.class);
+		for(int i=0;i<policyList.size();i++)
+		{
+			StlPolicy stlPolicy=(StlPolicy)policyList.get(i);
+			if(stlPolicy.getStlObjectId().equals(objectId)&&stlPolicy.getTenantId().equals(tenantId))
+			{
+				stlPolicyList.add(stlPolicy);
+			}
+		}
+		return stlPolicyList;
 	}
 
 	/**
-	 * 获取政策下面的所有结算项
+	 * 获取政策适配对象
 	 * 
 	 * @param policyId
 	 * @param tenantId
 	 * @return
+	 * @throws ParseException 
 	 */
-	public List<PolicyDetailQueryItemInfo> getPolicyItemList(Long policyId, String tenantId) {
+	public List<StlPolicyItemCondition> getPolicyItemList(Long policyId, String tenantId) throws ParseException {
 		// TODO Auto-generated method stub
-		IPolicyManageSV policyManageSV = DubboConsumerFactory.getService(IPolicyManageSV.class);
-		PolicyDetailQueryRequest request = new PolicyDetailQueryRequest();
-		request.setPolicyId(policyId);
-		request.setTenantId(tenantId);
-		PolicyDetailQueryResponse response = policyManageSV.queryPolicyDetail(request);
-		return response.getPolicyDetailQueryItemInfos();
+		ICacheClient cacheClient = CacheClientFactory
+                .getCacheClient(SmcCacheConstant.NameSpace.POLICY_CACHE);
+		String policyItemAll=cacheClient.get(SmcCacheConstant.POLICY_ITEM_CONDITION);
+		List<StlPolicyItemCondition> stlPolicyItemConditionList=new ArrayList<StlPolicyItemCondition>();
+		List<StlPolicyItemCondition> policyList=JSON.parseArray(policyItemAll,StlPolicyItemCondition.class);
+		for(StlPolicyItemCondition stlPolicyItemCondition:policyList)
+		{
+			if(stlPolicyItemCondition.getPolicyId()==policyId&&stlPolicyItemCondition.getTenantId().equals(tenantId))
+			{
+				stlPolicyItemConditionList.add(stlPolicyItemCondition);
+			}
+		}
+		return stlPolicyItemConditionList;
 	}
+	
+	
+	public List<StlPolicyItemPlan> getStlPolicyItemPlan(Long policyId,String tenantId) throws Exception
+	{
+		ICacheClient cacheClient = CacheClientFactory
+                .getCacheClient(SmcCacheConstant.NameSpace.POLICY_CACHE);
+		String policyItemAll=cacheClient.get(SmcCacheConstant.POLICY_ITEM_PLAN);
+		List<StlPolicyItemPlan> stlPolicyItemPlanList=new ArrayList<StlPolicyItemPlan>();
+		List<StlPolicyItemPlan> policyList=JSON.parseArray(policyItemAll, StlPolicyItemPlan.class);
+		for(int i=0;i<policyList.size();i++)
+		{
+			StlPolicyItemPlan stlPolicyItemPlan=(StlPolicyItemPlan)policyList.get(i);
+			if(stlPolicyItemPlan.getPolicyId()==policyId&&stlPolicyItemPlan.getTenantId().equals(tenantId))
+			{
+				stlPolicyItemPlanList.add(stlPolicyItemPlan);
+			}
+		}
+		return stlPolicyItemPlanList;
+	}
+	
 
 	public List getParamList() {
 		IDshmClient client = null;
-
 		if (client == null)
-
 			client = new DshmClient();
-
 		ICacheClient cacheClient = CacheFactoryUtil
-
 				.getCacheClient(CacheBLMapper.CACHE_BL_CAL_PARAM);
-
 		Map<String, String> params = new TreeMap<String, String>();
-
 		params.put("price_code", "999");
-
 		params.put("tenant_id", "VIV-BYD");
-
 		List<Map<String, String>> results = client.list("cp_price_info")
-
 				.where(params)
-
 				.executeQuery(cacheClient);
-
 		return results;
 	}
 
@@ -104,18 +139,15 @@ public class CalculateProxy {
 	 * @param policyItemList
 	 * @return
 	 */
-	public boolean matchPolicy(String[] stream, List paramList, List<PolicyDetailQueryItemInfo> policyItemList) {
-		Map map = valueMap(stream, paramList);
+	public boolean matchPolicy(String[] stream, List<StlPolicyItemCondition> policyItemList) {
 
 		boolean flag = true;
 		IElementManageSV elementManageSV = DubboConsumerFactory.getService(IElementManageSV.class);
-		for (PolicyDetailQueryItemInfo policyDetailQueryItemInfo : policyItemList) {
-			List<PolicyDetailQueryConditionInfo> policyConditionList = policyDetailQueryItemInfo
-					.getPolicyDetailQueryConditionInfos();
-			for (PolicyDetailQueryConditionInfo policyDetailQueryConditionInfo : policyConditionList) {
-				String matchType = policyDetailQueryConditionInfo.getMatchType();
-				String matchValue = policyDetailQueryConditionInfo.getMatchValue();
-				Long elementId = policyDetailQueryConditionInfo.getElementId();
+		
+			for (StlPolicyItemCondition stlPolicyItemCondition : policyItemList) {
+				String matchType = stlPolicyItemCondition.getMatchType();
+				String matchValue = stlPolicyItemCondition.getMatchValue();
+				Long elementId = stlPolicyItemCondition.getElementId();
 				ElementSearchResponseVO elementSearchResponseVO = elementManageSV.searchElementById(elementId);
 				long sortId = elementSearchResponseVO.getSortId();
 				int num = (int) sortId;
@@ -134,10 +166,8 @@ public class CalculateProxy {
 					Object result = ExpressionEvaluator.evaluate(expression, variables);
 					flag = Boolean.parseBoolean(result.toString());
 				}
-
 			}
-
-		}
+		
 
 		return flag;
 	}
@@ -156,13 +186,13 @@ public class CalculateProxy {
 
 	}
 
-	public void caculateFees(List<PolicyDetailQueryItemInfo> list, String[] stream) {
-		for (PolicyDetailQueryItemInfo policyDetailQueryItemInfo : list) {
-			List<PolicyDetailQueryPlanInfo> planInfoList = policyDetailQueryItemInfo.getPolicyDetailQueryPlanInfos();
-			for (PolicyDetailQueryPlanInfo policyDetailQueryPlanInfo : planInfoList) {
-
+	public double caculateFees(List<StlPolicyItemPlan> list, String[] stream) {
+		double value=0;
+		for (StlPolicyItemPlan stlPolicyItemPlan : list) {
+               value=docaculate(stlPolicyItemPlan,stream);
+              
 			}
-		}
+		return value;
 	}
 
 	/**
@@ -171,7 +201,7 @@ public class CalculateProxy {
 	 * @param calType
 	 * @return
 	 */
-	public double docaculate(PolicyDetailQueryPlanInfo policyDetailQueryPlanInfo, String[] stream) {
+	public double docaculate(StlPolicyItemPlan policyDetailQueryPlanInfo, String[] stream) {
 		double value = 0;
 		IElementManageSV elementManageSV = DubboConsumerFactory.getService(IElementManageSV.class);
 		String planType = policyDetailQueryPlanInfo.getPlanType();
@@ -183,7 +213,7 @@ public class CalculateProxy {
 		int num = (int) sortId;
 		String compare = stream[num];
 		if (planType.equals("nomal")) {//标准型
-			double calValue=Double.parseDouble(policyDetailQueryPlanInfo.getNormalCalValue());
+			double calValue=Double.parseDouble(policyDetailQueryPlanInfo.getCalValue());
 			if(calType.equals("ratio"))//按比例
 			{
 				value=Double.parseDouble(compare)*calValue;	
@@ -198,9 +228,10 @@ public class CalculateProxy {
 			}
 			
 		} else if (planType.equals("step")) {//阶梯
-			List<StepCalValue> list = policyDetailQueryPlanInfo.getStepCalValues();
+			  List<StepCalValue> stepCalValues = JSON.parseArray(
+					  policyDetailQueryPlanInfo.getCalValue(), StepCalValue.class);
 			String calValue = "";
-			for (StepCalValue stepCalValue : list) {
+			for (StepCalValue stepCalValue : stepCalValues) {
 				double start = Double.parseDouble(stepCalValue.getStartValue());
 				double end = Double.parseDouble(stepCalValue.getEndValue());
 				if(end<value&&start<value)
@@ -216,9 +247,10 @@ public class CalculateProxy {
 			}
 		} else if ("switch".equals(planType)) {//分档
 
-			List<StepCalValue> list = policyDetailQueryPlanInfo.getStepCalValues();
+			 List<StepCalValue> stepCalValues = JSON.parseArray(
+					  policyDetailQueryPlanInfo.getCalValue(), StepCalValue.class);
 			String calValue = "";
-			for (StepCalValue stepCalValue : list) {
+			for (StepCalValue stepCalValue : stepCalValues) {
 				double start = Double.parseDouble(stepCalValue.getStartValue());
 				double end = Double.parseDouble(stepCalValue.getEndValue());
 				if (Double.parseDouble(compare) > start && Double.parseDouble(compare) < end) {

@@ -56,6 +56,9 @@ public final class SmcCacheConstant {
         public static final String CAL_COMMON_CACHE="com.ai.topology.calculate.common";
         
         public static final String STATS_TIMES = "stats_times";
+        
+        public static final String BILL_CACHE="com.ai.topology.bill.cache";
+        
     }
     
     

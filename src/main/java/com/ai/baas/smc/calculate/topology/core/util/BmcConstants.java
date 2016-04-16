@@ -6,6 +6,9 @@ public class BmcConstants {
 	public static final String DUPLICATE_CHECKING_BOLT = "duplicate_checking";
 	public static final String RULE_ADAPT_BOLT = "rule_adapt";
 	public static final String COST_CALCULATING_BOLT = "cost_calculating";
+	
+	
+	public static final String STL_BILL_DATA$BILL_ID$SEQ="STL_BILL_DATA$BILL_ID$SEQ";
 
 	
 	

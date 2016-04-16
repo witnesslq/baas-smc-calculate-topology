@@ -263,7 +263,7 @@ public class CalculateProxy {
 			stlBillData.setStlObjectId(objectId);
 			stlBillData.setStlElementId(elementId);
 			stlBillData.setBillStyleSn(billStyle);
-			stlBillData.setBillId(SmcSeqUtil.createBillSEQ());
+			stlBillData.setBillId(Long.parseLong(SmcSeqUtil.getRandom()));
 			dataList.add(stlBillData);
 		} else {
 			for (StlBillData stlBillData : dataList) {

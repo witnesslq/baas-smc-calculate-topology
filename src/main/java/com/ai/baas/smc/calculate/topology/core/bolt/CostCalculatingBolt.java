@@ -58,9 +58,11 @@ public class CostCalculatingBolt extends BaseBasicBolt {
 		String tenantId="";
 		String acctId="";
 		String objectId="";
+		String batchNo="";
 		try
 		{
 			input.getStringByField(BaseConstants.TENANT_ID);
+			batchNo=input.getStringByField(BaseConstants.BATCH_SERIAL_NUMBER);
 			period=input.getStringByField(BaseConstants.ACCOUNT_PERIOD);
 			line=input.getStringByField(BaseConstants.RECORD_DATA);
 			 tenantId=input.getStringByField(BaseConstants.TENANT_ID);
@@ -71,29 +73,40 @@ public class CostCalculatingBolt extends BaseBasicBolt {
 		  List<StlPolicy> policyList=calculateProxy.getPolicyList(objectId, tenantId);
 		  for(StlPolicy stlPolicy:policyList)
 		  {
+			long elementId=stlPolicy.getStlElementId();
+			String stlObjectId=stlPolicy.getStlObjectId();
 			Long policyId= stlPolicy.getPolicyId();
+			String billStyleSn=stlPolicy.getBillStyleSn();
 			List<StlPolicyItemCondition> stlPolicyItemConditionList=calculateProxy.getPolicyItemList(policyId, tenantId);
 			List<StlPolicyItemPlan> stlPolicyItemPlanList=calculateProxy.getStlPolicyItemPlan(policyId, tenantId);
 			if(calculateProxy.matchPolicy(stream, stlPolicyItemConditionList))
 			{
-				value= calculateProxy.caculateFees(stlPolicyItemPlanList, stream);
+				for(StlPolicyItemPlan stlPolicyItemPlan:stlPolicyItemPlanList)
+				{
+					value= calculateProxy.caculateFees(stlPolicyItemPlan, stream);
+					
+					calculateProxy.dealBill(stlPolicy.getPolicyCode(), value, tenantId, batchNo, stlObjectId, elementId, billStyleSn, period);
+					
+					 line=line+BaseConstants.FIELD_SPLIT+value;
+					  MessageParser messageParser = null;
+					  List<Object> values = null;
+					  MessageParser.parseObject(line, mappingRules, outputFields);
+					  messageParser.getData();
+						values = messageParser.toTupleData();
+						if (CollectionUtils.isNotEmpty(values)){
+							collector.emit(values);
+						}
+						String [] family=new String[0];
+						family[0]="data";
+						String row="";
+						HbaseClient.creatTable("stl_bill_detail_data_"+period, family);
+						HbaseClient.addRowByMap("stl_bill_detail_data_"+period, row, "data", messageParser.getData());
+				}
+				
 				
 			}
 		  }
-		  line=line+BaseConstants.FIELD_SPLIT+value;
-		  MessageParser messageParser = null;
-		  List<Object> values = null;
-		  MessageParser.parseObject(line, mappingRules, outputFields);
-		  messageParser.getData();
-			values = messageParser.toTupleData();
-			if (CollectionUtils.isNotEmpty(values)){
-				collector.emit(values);
-			}
-			String [] family=new String[0];
-			family[0]="data";
-			String row="";
-			HbaseClient.creatTable("stl_bill_detail_data_"+period, family);
-			HbaseClient.addRowByMap("stl_bill_detail_data_"+period, row, "data", messageParser.getData());
+		 
 		}
 		catch(Exception e)
 		{

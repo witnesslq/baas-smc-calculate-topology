@@ -52,6 +52,18 @@ public final class SmcCacheConstant {
         public static final String BILL_STYLE_CACHE = "com.ai.baas.smc.cache.billstyle";
 
         public static final String ELEMENT_CACHE = "com.ai.baas.smc.cache.element";
+        
+        public static final String CAL_COMMON_CACHE="com.ai.topology.calculate.common";
+        
+        public static final String STATS_TIMES = "stats_times";
+    }
+    
+    
+    public static class Cache{
+    	public static final String COUNTER="Counter";
+    	
+    	public static final String finishKey
+    	 = "busidata_tenantId_batchNo_billTimeSn_objectId_stats_times";
     }
 
     public static class Dshm {

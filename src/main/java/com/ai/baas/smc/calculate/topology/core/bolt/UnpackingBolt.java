@@ -24,14 +24,13 @@ import com.ai.baas.storm.util.BaseConstants;
 public class UnpackingBolt extends BaseBasicBolt {
 	private static final long serialVersionUID = -8200039989835637219L;
 	private static Logger logger = LoggerFactory.getLogger(UnpackingBolt.class);
-	private MappingRule[] mappingRules = new MappingRule[2];
-	//private String dbName = "jdbc.bmc";
-	private String[] outputFields;
+	 private MappingRule[] mappingRules = new MappingRule[2];
+
+	    private String[] outputFields = new String[] { "data" };
 	
 	
 	public UnpackingBolt(String aOutputFields){
 		System.out.println("===============UnpackingBolt 00000000000000000====");
-		outputFields = StringUtils.splitPreserveAllTokens(aOutputFields, ",");
 	}
 	
 	@Override
@@ -44,10 +43,11 @@ public class UnpackingBolt extends BaseBasicBolt {
 	
 	@Override
 	public void execute(Tuple input, BasicOutputCollector collector) {
+		
+		
 		String line = "";
 		try{
 			line = input.getString(0);
-			//System.out.println("=============line=="+line);
 			List<Object> values = null;
 			String[] inputDatas = StringUtils.splitPreserveAllTokens(line, BaseConstants.RECORD_SPLIT);
 			MessageParser messageParser = null;

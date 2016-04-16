@@ -1,7 +1,6 @@
 package com.ai.baas.smc.calculate.topology.core.proxy;
 
 import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -18,6 +17,7 @@ import com.ai.baas.smc.api.elementmanage.interfaces.IElementManageSV;
 import com.ai.baas.smc.api.elementmanage.param.ElementSearchResponseVO;
 import com.ai.baas.smc.api.policymanage.param.StepCalValue;
 import com.ai.baas.smc.calculate.topology.core.bo.StlBillData;
+import com.ai.baas.smc.calculate.topology.core.bo.StlElement;
 import com.ai.baas.smc.calculate.topology.core.bo.StlPolicy;
 import com.ai.baas.smc.calculate.topology.core.bo.StlPolicyItemCondition;
 import com.ai.baas.smc.calculate.topology.core.bo.StlPolicyItemPlan;
@@ -128,14 +128,16 @@ public class CalculateProxy {
 	public boolean matchPolicy(String[] stream, List<StlPolicyItemCondition> policyItemList) {
 
 		boolean flag = true;
-		IElementManageSV elementManageSV = DubboConsumerFactory.getService(IElementManageSV.class);
+		 ICacheClient elementcacheClient = CacheClientFactory
+	                .getCacheClient(SmcCacheConstant.NameSpace.ELEMENT_CACHE);
 
 		for (StlPolicyItemCondition stlPolicyItemCondition : policyItemList) {
 			String matchType = stlPolicyItemCondition.getMatchType();
 			String matchValue = stlPolicyItemCondition.getMatchValue();
 			Long elementId = stlPolicyItemCondition.getElementId();
-			ElementSearchResponseVO elementSearchResponseVO = elementManageSV.searchElementById(elementId);
-			long sortId = elementSearchResponseVO.getSortId();
+			String elementALl=elementcacheClient.get(stlPolicyItemCondition.getTenantId()+"."+elementId);
+			StlElement stlElement=JSON.parseObject(elementALl, StlElement.class);
+			long sortId = stlElement.getSortId();
 			int num = (int) sortId;
 			String compare = stream[num];
 
@@ -186,13 +188,15 @@ public class CalculateProxy {
 	 */
 	public double docaculate(StlPolicyItemPlan policyDetailQueryPlanInfo, String[] stream) {
 		double value = 0;
-		IElementManageSV elementManageSV = DubboConsumerFactory.getService(IElementManageSV.class);
+		 ICacheClient elementcacheClient = CacheClientFactory
+	                .getCacheClient(SmcCacheConstant.NameSpace.ELEMENT_CACHE);
 		String planType = policyDetailQueryPlanInfo.getPlanType();
 		String calType = policyDetailQueryPlanInfo.getCalType();// 算费方式
 		Long elementId = policyDetailQueryPlanInfo.getElementId();
 
-		ElementSearchResponseVO elementSearchResponseVO = elementManageSV.searchElementById(elementId);
-		long sortId = elementSearchResponseVO.getSortId();
+		String elementALl=elementcacheClient.get(policyDetailQueryPlanInfo.getTenantId()+"."+elementId);
+		StlElement stlElement=JSON.parseObject(elementALl, StlElement.class);
+		long sortId = stlElement.getSortId();
 		int num = (int) sortId;
 		String compare = stream[num];
 		if (planType.equals("nomal")) {// 标准型

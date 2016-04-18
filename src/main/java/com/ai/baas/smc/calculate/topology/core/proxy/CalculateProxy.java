@@ -25,7 +25,6 @@ import com.ai.baas.smc.calculate.topology.core.util.SmcCacheConstant;
 import com.ai.baas.smc.calculate.topology.core.util.SmcSeqUtil;
 import com.ai.baas.storm.jdbc.JdbcProxy;
 import com.ai.opt.sdk.cache.factory.CacheClientFactory;
-import com.ai.opt.sdk.util.DubboConsumerFactory;
 import com.ai.paas.ipaas.mcs.interfaces.ICacheClient;
 import com.alibaba.dubbo.common.json.ParseException;
 import com.alibaba.fastjson.JSON;
@@ -265,6 +264,7 @@ public class CalculateProxy {
 			stlBillData.setStlObjectId(objectId);
 			stlBillData.setStlElementId(elementId);
 			stlBillData.setBillStyleSn(billStyle);
+			stlBillData.setOrigFee(Float.parseFloat(String.valueOf(value)));
 			stlBillData.setBillId(Long.parseLong(SmcSeqUtil.getRandom()));
 			dataList.add(stlBillData);
 		} else {

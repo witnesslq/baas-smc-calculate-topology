@@ -1,5 +1,6 @@
 package com.ai.baas.smc.calculate.topology.core.spout;
 
+import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.hbase.KeyValue;
@@ -11,7 +12,12 @@ import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.util.Bytes;
 
+import com.ai.baas.smc.calculate.topology.core.bo.FinishListVo;
+import com.ai.baas.smc.calculate.topology.core.util.SmcCacheConstant;
 import com.ai.baas.storm.util.HBaseProxy;
+import com.ai.opt.sdk.cache.factory.CacheClientFactory;
+import com.ai.paas.ipaas.mcs.interfaces.ICacheClient;
+import com.alibaba.fastjson.JSON;
 
 import backtype.storm.spout.SpoutOutputCollector;
 import backtype.storm.task.TopologyContext;
@@ -36,13 +42,20 @@ public class CalSpout extends BaseRichSpout{
 
 	@Override
 	public void nextTuple() {
-		// TODO Auto-generated method stub
+		ICacheClient cacheStatsTimes = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.STATS_TIMES);
+		String finishlist = cacheStatsTimes.get(SmcCacheConstant.Cache.finishKey);
+		List<FinishListVo> voList = JSON.parseArray(finishlist, FinishListVo.class);
+		for (FinishListVo vo : voList) {
+		String tenantId=vo.getTenantId();
+		String batchNo=vo.getBatchNo();
+		String billTimeSn=vo.getBillTimeSn();
 		Scan scan = new Scan();
+		
 		try
 		{
-		Table table = connection.getTable(TableName.valueOf("RTM_OUTPUT_DETAIL_201604"));
+		Table table = connection.getTable(TableName.valueOf("RTM_OUTPUT_DETAIL_"+billTimeSn));
 		 ResultScanner rs = null;
-
+          
 		 rs = table.getScanner(scan);
 	      table.close();
 		for (Result r : rs) {// 按行去遍历
@@ -51,9 +64,10 @@ public class CalSpout extends BaseRichSpout{
 	        	if(Bytes.toString(kv.getQualifier()).equals("record"))
 	        	{
 	        		line=Bytes.toString(kv.getValue());
+	        		collector.emit(new Values(line));
 	        	}
 	          
-	        	collector.emit(new Values(line));
+	        	
 	         
 	        }
 		}
@@ -64,6 +78,8 @@ public class CalSpout extends BaseRichSpout{
 		}
 
 		
+		
+		}
 	}
 
 	@Override

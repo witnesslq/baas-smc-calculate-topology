@@ -24,6 +24,8 @@ public final class SmcCacheConstant {
     public static final String POLICY_ITEM_CONDITION="policy_item_condition";
     
     public static final String POLICY_ITEM_PLAN="policy_item_plan";
+    
+    public static final String POLICY_ITEM="policy_item";
 
     public static final class TypeCode {
         private TypeCode() {

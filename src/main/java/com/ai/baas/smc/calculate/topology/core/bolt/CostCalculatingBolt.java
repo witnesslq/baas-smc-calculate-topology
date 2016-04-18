@@ -1,6 +1,5 @@
 package com.ai.baas.smc.calculate.topology.core.bolt;
 
-import java.sql.Connection;
 import java.util.List;
 import java.util.Map;
 
@@ -9,6 +8,7 @@ import org.apache.commons.lang.StringUtils;
 
 import com.ai.baas.smc.calculate.topology.core.bo.FinishListVo;
 import com.ai.baas.smc.calculate.topology.core.bo.StlPolicy;
+import com.ai.baas.smc.calculate.topology.core.bo.StlPolicyItem;
 import com.ai.baas.smc.calculate.topology.core.bo.StlPolicyItemCondition;
 import com.ai.baas.smc.calculate.topology.core.bo.StlPolicyItemPlan;
 import com.ai.baas.smc.calculate.topology.core.proxy.CalculateProxy;
@@ -78,6 +78,10 @@ public class CostCalculatingBolt extends BaseBasicBolt {
 				String stlObjectId = stlPolicy.getStlObjectId();
 				Long policyId = stlPolicy.getPolicyId();
 				String billStyleSn = stlPolicy.getBillStyleSn();
+				List<StlPolicyItem> policyItemList= calculateProxy.getStlPolicyItemLists(policyId,tenantId);
+				for(StlPolicyItem stlPolicyItem:policyItemList)
+				{
+				
 				List<StlPolicyItemCondition> stlPolicyItemConditionList = calculateProxy.getPolicyItemList(policyId,
 						tenantId);
 				List<StlPolicyItemPlan> stlPolicyItemPlanList = calculateProxy.getStlPolicyItemPlan(policyId, tenantId);
@@ -109,7 +113,7 @@ public class CostCalculatingBolt extends BaseBasicBolt {
 
 				}
 			}
-
+			}
 			/**
 			 * 更新计数器
 			 */

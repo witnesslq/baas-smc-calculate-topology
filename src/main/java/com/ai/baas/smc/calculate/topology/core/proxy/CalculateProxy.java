@@ -17,6 +17,7 @@ import com.ai.baas.smc.api.policymanage.param.StepCalValue;
 import com.ai.baas.smc.calculate.topology.core.bo.StlBillData;
 import com.ai.baas.smc.calculate.topology.core.bo.StlElement;
 import com.ai.baas.smc.calculate.topology.core.bo.StlPolicy;
+import com.ai.baas.smc.calculate.topology.core.bo.StlPolicyItem;
 import com.ai.baas.smc.calculate.topology.core.bo.StlPolicyItemCondition;
 import com.ai.baas.smc.calculate.topology.core.bo.StlPolicyItemPlan;
 import com.ai.baas.smc.calculate.topology.core.util.CacheBLMapper;
@@ -65,6 +66,29 @@ public class CalculateProxy {
 		return stlPolicyList;
 	}
 
+	
+	
+	/**
+	 * 
+	 * @param policyId
+	 * @param tenantId
+	 * @return
+	 */
+	public List<StlPolicyItem> getStlPolicyItemLists(Long policyId, String tenantId)
+	{
+		ICacheClient cacheClient = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.POLICY_CACHE);
+		String policyItemAll = cacheClient.get(SmcCacheConstant.POLICY_ITEM);
+		List<StlPolicyItem> stlPolicyItemList = new ArrayList<StlPolicyItem>();
+		List<StlPolicyItem> policyList = JSON.parseArray(policyItemAll, StlPolicyItem.class);
+		for(StlPolicyItem stlPolicyItem:policyList){
+			if(stlPolicyItem.getPolicyId()==policyId&&stlPolicyItem.getTenantId().equals(tenantId))
+			{
+				stlPolicyItemList.add(stlPolicyItem);
+			}
+		}
+		return stlPolicyItemList;
+	}
+	
 	/**
 	 * 获取政策适配对象
 	 * 
@@ -73,14 +97,14 @@ public class CalculateProxy {
 	 * @return
 	 * @throws ParseException
 	 */
-	public List<StlPolicyItemCondition> getPolicyItemList(Long policyId, String tenantId) throws ParseException {
+	public List<StlPolicyItemCondition> getPolicyItemList(Long itemId, String tenantId) throws ParseException {
 		// TODO Auto-generated method stub
 		ICacheClient cacheClient = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.POLICY_CACHE);
 		String policyItemAll = cacheClient.get(SmcCacheConstant.POLICY_ITEM_CONDITION);
 		List<StlPolicyItemCondition> stlPolicyItemConditionList = new ArrayList<StlPolicyItemCondition>();
 		List<StlPolicyItemCondition> policyList = JSON.parseArray(policyItemAll, StlPolicyItemCondition.class);
 		for (StlPolicyItemCondition stlPolicyItemCondition : policyList) {
-			if (stlPolicyItemCondition.getPolicyId() == policyId
+			if (stlPolicyItemCondition.getItemId() == itemId
 					&& stlPolicyItemCondition.getTenantId().equals(tenantId)) {
 				stlPolicyItemConditionList.add(stlPolicyItemCondition);
 			}
@@ -88,14 +112,14 @@ public class CalculateProxy {
 		return stlPolicyItemConditionList;
 	}
 
-	public List<StlPolicyItemPlan> getStlPolicyItemPlan(Long policyId, String tenantId) throws Exception {
+	public List<StlPolicyItemPlan> getStlPolicyItemPlan(Long itemId, String tenantId) throws Exception {
 		ICacheClient cacheClient = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.POLICY_CACHE);
 		String policyItemAll = cacheClient.get(SmcCacheConstant.POLICY_ITEM_PLAN);
 		List<StlPolicyItemPlan> stlPolicyItemPlanList = new ArrayList<StlPolicyItemPlan>();
 		List<StlPolicyItemPlan> policyList = JSON.parseArray(policyItemAll, StlPolicyItemPlan.class);
 		for (int i = 0; i < policyList.size(); i++) {
 			StlPolicyItemPlan stlPolicyItemPlan = (StlPolicyItemPlan) policyList.get(i);
-			if (stlPolicyItemPlan.getPolicyId() == policyId && stlPolicyItemPlan.getTenantId().equals(tenantId)) {
+			if (stlPolicyItemPlan.getItemId() == itemId && stlPolicyItemPlan.getTenantId().equals(tenantId)) {
 				stlPolicyItemPlanList.add(stlPolicyItemPlan);
 			}
 		}
@@ -196,6 +220,9 @@ public class CalculateProxy {
 		long sortId = stlElement.getSortId();
 		int num = (int) sortId;
 		String compare = stream[num];
+		
+		
+		
 		if (planType.equals("nomal")) {// 标准型
 			double calValue = Double.parseDouble(policyDetailQueryPlanInfo.getCalValue());
 			if (calType.equals("ratio"))// 按比例
@@ -223,6 +250,11 @@ public class CalculateProxy {
 				if (value > start && value < end) {
 					calValue = stepCalValue.getCalValue();
 					value += Double.parseDouble(calValue) * (Double.parseDouble(compare) - start);
+				}
+				if (calType.equals("ratio")) {
+					value = Double.parseDouble(compare) * value;
+				} else if (calType.equals("price")) {
+					value = Double.parseDouble(compare) * Double.parseDouble(calValue)*value;
 				}
 
 			}
@@ -253,7 +285,6 @@ public class CalculateProxy {
 	public void dealBill(String policyCode, double value, String tenantId, String batchNo, String objectId,
 			long elementId, String billStyle, String billTime) {
 		ICacheClient billClient = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.BILL_CACHE);
-
 		String billAll = billClient.get("bill");
 		List<StlBillData> dataList = JSON.parseArray(billAll, StlBillData.class);
 		if (!contains(policyCode, dataList)) {

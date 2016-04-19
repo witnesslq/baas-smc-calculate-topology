@@ -282,7 +282,7 @@ public class CalculateProxy {
 		return value;
 	}
 
-	public void dealBill(String policyCode, double value, String tenantId, String batchNo, String objectId,
+	public synchronized  void dealBill(String policyCode, double value, String tenantId, String batchNo, String objectId,
 			long elementId, String billStyle, String billTime) {
 		ICacheClient billClient = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.BILL_CACHE);
 		String billAll = billClient.get("bill");

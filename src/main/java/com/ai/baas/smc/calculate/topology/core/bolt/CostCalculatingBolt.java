@@ -97,7 +97,7 @@ public class CostCalculatingBolt extends BaseBasicBolt {
 					for (StlPolicyItemPlan stlPolicyItemPlan : stlPolicyItemPlanList) {
 						value = calculateProxy.caculateFees(stlPolicyItemPlan, data);
 						calculateProxy.dealBill(stlPolicy.getPolicyCode(), value, tenantId, batchNo, stlObjectId,
-								elementId, billStyleSn, period);
+								elementId, billStyleSn, period,stlPolicyItemPlan.getFeeItem());
 						line = line + BaseConstants.FIELD_SPLIT + value;
 						List<Object> values = null;
 						MessageParser.parseObject(line, mappingRules, outputFields);
@@ -133,7 +133,7 @@ public class CostCalculatingBolt extends BaseBasicBolt {
 			for (FinishListVo vo : voList) {
 				if (vo.getBatchNo().equals(batchNo)) {
 					if (vo.getStats_times().equals(counter)) {
-						calculateProxy.insertBillData("stl_bill_data_"+period);
+						calculateProxy.insertBillData("stl_bill_data_"+period,"stl_bill_item_data_"+period);
 					}
 				}
 

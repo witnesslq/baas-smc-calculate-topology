@@ -278,8 +278,10 @@ public class CalculateProxy {
 		return value;
 	}
 
+	
+
 	public synchronized  void dealBill(String policyCode, double value, String tenantId, String batchNo, String objectId,
-			long elementId, String billStyle, String billTime) {
+			long elementId, String billStyle, String billTime,String feeItemId) {
 		ICacheClient billClient = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.BILL_CACHE);
 		String billAll = billClient.get("bill");
 		List<StlBillData> dataList = JSON.parseArray(billAll, StlBillData.class);
@@ -292,6 +294,7 @@ public class CalculateProxy {
 			stlBillData.setStlElementId(elementId);
 			stlBillData.setBillStyleSn(billStyle);
 			stlBillData.setOrigFee(Float.parseFloat(String.valueOf(value)));
+			stlBillData.setFeeItemId(feeItemId);
 			stlBillData.setBillId(Long.parseLong(SmcSeqUtil.getRandom()));
 			dataList.add(stlBillData);
 		} else {
@@ -330,19 +333,19 @@ public class CalculateProxy {
 	}
 	
 	
-	public void insertBillData(String tableName) throws Exception
+	public void insertBillData(String tableName,String itemTableName) throws Exception
 	{
 		ICacheClient billClient = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.BILL_CACHE);
 		String billAll = billClient.get("bill");
 		List<StlBillData> dataList = JSON.parseArray(billAll, StlBillData.class);
 		for (StlBillData stlBillData : dataList) {
-			insert(stlBillData,tableName);	
+			insert(stlBillData,tableName,itemTableName);	
 		}
 	}
 	
 	
 	
-	public void insert(StlBillData stlBillData,String tableName) throws Exception
+	public void insert(StlBillData stlBillData,String tableName,String itemTableName) throws Exception
 	{
 		Connection connection=JdbcProxy.getConnection("");
 		 Statement st = null;
@@ -350,10 +353,17 @@ public class CalculateProxy {
 		 String sql = "insert into "+tableName+"(bill_id,bill_from,batch_no,tenant_id,policy_code,stl_object_id,"
 		 		+ "stl_element_id,stl_element_sn,bill_style_sn,bill_time_sn,bill_start_time,bill_end_time,orig_fee) values("+stlBillData.getBillId()+","+
 				 stlBillData.getBillFrom()+","+stlBillData.getBatchNo()+","+stlBillData.getTenantId()+","+stlBillData.getPolicyCode()+","+
-		 		stlBillData.getStlObjectId()+","+stlBillData.getStlElementId()+","+stlBillData.getStlElementSn()+","+stlBillData.getBillTimeSn()+","+stlBillData.getBillStartTime()+","+stlBillData.getBillEndTime()+")";
+		 		stlBillData.getStlObjectId()+","+stlBillData.getStlElementId()+","+stlBillData.getStlElementSn()+","+stlBillData.getBillTimeSn()+","+stlBillData.getBillStartTime()+","+stlBillData.getBillEndTime()+","+stlBillData.getOrigFee()+")";
          System.out.println("sql="+sql);
          int result = st.executeUpdate(sql);
-
+         
+         
+         String feeItemSql = "insert into "+itemTableName+"(bill_item_id,bill_id,tenant_id,item_type,fee_item_id,total_fee"
+ 		 		+ " values(,"+stlBillData.getBillId()+","+
+ 				 stlBillData.getTenantId()+",'aaa',"+
+ 		 		stlBillData.getFeeItemId()+","+stlBillData.getOrigFee()+")";
+         
+         int itemresult = st.executeUpdate(feeItemSql);
 	}
 	
 

@@ -56,8 +56,19 @@ public class StlBillData {
     private Timestamp createTime;
 
     private String yyyyMm;
+    
+    
+    private String feeItemId;
 
-    public Long getBillId() {
+    public String getFeeItemId() {
+		return feeItemId;
+	}
+
+	public void setFeeItemId(String feeItemId) {
+		this.feeItemId = feeItemId;
+	}
+
+	public Long getBillId() {
         return billId;
     }
 

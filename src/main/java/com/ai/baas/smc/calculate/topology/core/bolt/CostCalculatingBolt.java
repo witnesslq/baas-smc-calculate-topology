@@ -5,6 +5,8 @@ import java.util.Map;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.ai.baas.smc.calculate.topology.core.bo.FinishListVo;
 import com.ai.baas.smc.calculate.topology.core.bo.StlPolicy;
@@ -29,6 +31,8 @@ import backtype.storm.topology.base.BaseBasicBolt;
 import backtype.storm.tuple.Tuple;
 
 public class CostCalculatingBolt extends BaseBasicBolt {
+	
+	   private static final Logger LOG = LoggerFactory.getLogger(CostCalculatingBolt.class);
 
 	private static final long serialVersionUID = -3214008757998306486L;
 
@@ -52,7 +56,8 @@ public class CostCalculatingBolt extends BaseBasicBolt {
 
 	@Override
 	public void execute(Tuple input, BasicOutputCollector collector) {
-		// TODO Auto-generated method stub
+		 Map<String, String> data = null;
+		 
 		String line = "";
 		double value = 0;
 		String period = "";
@@ -62,16 +67,19 @@ public class CostCalculatingBolt extends BaseBasicBolt {
 		String batchNo = "";
 		String source = "";
 		try {
-			input.getStringByField(BaseConstants.TENANT_ID);
-			batchNo = input.getStringByField(BaseConstants.BATCH_SERIAL_NUMBER);
-			period = input.getStringByField(BaseConstants.ACCOUNT_PERIOD);
-			source = input.getStringByField(BaseConstants.SOURCE);
-			line = input.getStringByField(BaseConstants.RECORD_DATA);
-			tenantId = input.getStringByField(BaseConstants.TENANT_ID);
-			acctId = input.getStringByField(BaseConstants.ACCT_ID);
+			  String inputData = input.getString(0);
+	            LOG.info(" ====== 开始执行对账bolt，inputData = [" + inputData + "]");
+	            /* 1.获取并解析输入信息 */
+	            MessageParser messageParser = MessageParser.parseObject(inputData, mappingRules,
+	                    outputFields);
+	            data = messageParser.getData();
+			batchNo = data.get(BaseConstants.BATCH_SERIAL_NUMBER);
+			period = data.get(BaseConstants.ACCOUNT_PERIOD);
+			source = data.get(BaseConstants.SOURCE);
+			tenantId = data.get(BaseConstants.TENANT_ID);
+			acctId =data.get(BaseConstants.ACCT_ID);
 
 			objectId = input.getStringByField("objectId");
-			String[] stream = StringUtils.splitPreserveAllTokens(line, BaseConstants.FIELD_SPLIT);
 			List<StlPolicy> policyList = calculateProxy.getPolicyList(objectId, tenantId);
 			for (StlPolicy stlPolicy : policyList) {
 				long elementId = stlPolicy.getStlElementId();
@@ -81,20 +89,19 @@ public class CostCalculatingBolt extends BaseBasicBolt {
 				List<StlPolicyItem> policyItemList= calculateProxy.getStlPolicyItemLists(policyId,tenantId);
 				for(StlPolicyItem stlPolicyItem:policyItemList)
 				{
-				
-				List<StlPolicyItemCondition> stlPolicyItemConditionList = calculateProxy.getPolicyItemList(policyId,
+				Long itemId=stlPolicyItem.getItemId();
+				List<StlPolicyItemCondition> stlPolicyItemConditionList = calculateProxy.getPolicyItemList(itemId,
 						tenantId);
-				List<StlPolicyItemPlan> stlPolicyItemPlanList = calculateProxy.getStlPolicyItemPlan(policyId, tenantId);
-				if (calculateProxy.matchPolicy(stream, stlPolicyItemConditionList)) {
+				List<StlPolicyItemPlan> stlPolicyItemPlanList = calculateProxy.getStlPolicyItemPlan(itemId, tenantId);
+				if (calculateProxy.matchPolicy(data, stlPolicyItemConditionList)) {
 					for (StlPolicyItemPlan stlPolicyItemPlan : stlPolicyItemPlanList) {
-						value = calculateProxy.caculateFees(stlPolicyItemPlan, stream);
+						value = calculateProxy.caculateFees(stlPolicyItemPlan, data);
 						calculateProxy.dealBill(stlPolicy.getPolicyCode(), value, tenantId, batchNo, stlObjectId,
 								elementId, billStyleSn, period);
 						line = line + BaseConstants.FIELD_SPLIT + value;
-						MessageParser messageParser = null;
 						List<Object> values = null;
 						MessageParser.parseObject(line, mappingRules, outputFields);
-						String order_id = messageParser.getData().get("order_id");
+						String order_id = data.get("order_id");
 						values = messageParser.toTupleData();
 						if (CollectionUtils.isNotEmpty(values)) {
 							collector.emit(values);

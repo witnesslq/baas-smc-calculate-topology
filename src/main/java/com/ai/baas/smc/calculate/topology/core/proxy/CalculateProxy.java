@@ -146,7 +146,7 @@ public class CalculateProxy {
 	 * @param policyItemList
 	 * @return
 	 */
-	public boolean matchPolicy(String[] stream, List<StlPolicyItemCondition> policyItemList) {
+	public boolean matchPolicy(Map data, List<StlPolicyItemCondition> policyItemList) {
 
 		boolean flag = true;
 		 ICacheClient elementcacheClient = CacheClientFactory
@@ -155,12 +155,8 @@ public class CalculateProxy {
 		for (StlPolicyItemCondition stlPolicyItemCondition : policyItemList) {
 			String matchType = stlPolicyItemCondition.getMatchType();
 			String matchValue = stlPolicyItemCondition.getMatchValue();
-			Long elementId = stlPolicyItemCondition.getElementId();
-			String elementALl=elementcacheClient.get(stlPolicyItemCondition.getTenantId()+"."+elementId);
-			StlElement stlElement=JSON.parseObject(elementALl, StlElement.class);
-			long sortId = stlElement.getSortId();
-			int num = (int) sortId;
-			String compare = stream[num];
+	
+			String compare =(String)data.get("content");
 
 			if (matchType.equals("in")) {
 				flag = IKin.in(matchValue, compare);
@@ -194,9 +190,9 @@ public class CalculateProxy {
 
 	}
 
-	public double caculateFees(StlPolicyItemPlan stlPolicyItemPlan, String[] stream) {
+	public double caculateFees(StlPolicyItemPlan stlPolicyItemPlan, Map data) {
 		double value = 0;
-		value = docaculate(stlPolicyItemPlan, stream);
+		value = docaculate(stlPolicyItemPlan, data);
 		return value;
 	}
 
@@ -207,7 +203,7 @@ public class CalculateProxy {
 	 * @param calType
 	 * @return
 	 */
-	public double docaculate(StlPolicyItemPlan policyDetailQueryPlanInfo, String[] stream) {
+	public double docaculate(StlPolicyItemPlan policyDetailQueryPlanInfo,Map data) {
 		double value = 0;
 		 ICacheClient elementcacheClient = CacheClientFactory
 	                .getCacheClient(SmcCacheConstant.NameSpace.ELEMENT_CACHE);
@@ -219,7 +215,7 @@ public class CalculateProxy {
 		StlElement stlElement=JSON.parseObject(elementALl, StlElement.class);
 		long sortId = stlElement.getSortId();
 		int num = (int) sortId;
-		String compare = stream[num];
+		String compare =(String)data.get("content");
 		
 		
 		

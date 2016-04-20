@@ -7,6 +7,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+import org.apache.poi.hssf.usermodel.HSSFCell;
+import org.apache.poi.hssf.usermodel.HSSFCellStyle;
+import org.apache.poi.hssf.usermodel.HSSFRow;
+import org.apache.poi.hssf.usermodel.HSSFSheet;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.wltea.expression.ExpressionEvaluator;
 import org.wltea.expression.datameta.Variable;
 
@@ -364,6 +369,122 @@ public class CalculateProxy {
  		 		stlBillData.getFeeItemId()+","+stlBillData.getOrigFee()+")";
          
          int itemresult = st.executeUpdate(feeItemSql);
+	}
+	
+	
+	
+	public void exportExcel()
+	{
+		ICacheClient billClient = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.BILL_CACHE);
+		String billAll = billClient.get("bill");
+		List<StlBillData> dataList = JSON.parseArray(billAll, StlBillData.class);
+		
+		
+		 // 第一步，创建一个webbook，对应一个Excel文件  
+        HSSFWorkbook wb = new HSSFWorkbook();  
+        for(int i=0;i<dataList.size();i++)
+        {
+        	StlBillData stlBillData=(StlBillData)dataList.get(i);	
+        // 第二步，在webbook中添加一个sheet,对应Excel文件中的sheet  
+        HSSFSheet sheet = wb.createSheet("账单"+i);  
+        // 第三步，在sheet中添加表头第0行,注意老版本poi对Excel的行数列数有限制short  
+        HSSFRow row = sheet.createRow((int) 0);  
+        // 第四步，创建单元格，并设置值表头 设置表头居中  
+        HSSFCellStyle style = wb.createCellStyle();  
+        style.setAlignment(HSSFCellStyle.ALIGN_CENTER); // 创建一个居中格式  
+  
+        HSSFCell cell = row.createCell((short) 0);  
+        cell.setCellValue("结算方");  
+        cell.setCellStyle(style); 
+        cell=row.createCell((int)1);
+        cell.setCellValue(stlBillData.getBillFrom());
+        cell.setCellStyle(style); 
+        
+        cell = row.createCell((short) 2);  
+        cell.setCellValue("批次号");  
+        cell.setCellStyle(style);  
+        
+        cell=row.createCell((int)3);
+        cell.setCellValue(stlBillData.getBatchNo());
+        cell.setCellStyle(style); 
+        
+        
+        HSSFRow row1 = sheet.createRow((int) 1);  
+        HSSFCell cell1 = row1.createCell((short) 0);  
+        cell1.setCellValue("政策编码");  
+        cell1.setCellStyle(style); 
+         cell1 = row1.createCell((short)1);  
+        cell1.setCellValue(stlBillData.getPolicyCode());  
+        cell1.setCellStyle(style); 
+        
+        
+        cell1 = row1.createCell((short) 2);  
+        cell1.setCellValue("账期");  
+        cell1.setCellStyle(style);
+        
+        cell1 = row1.createCell((short) 3);  
+        cell1.setCellValue(stlBillData.getBillTimeSn());  
+        cell1.setCellStyle(style);
+        
+        
+        
+        HSSFRow row2 = sheet.createRow((int) 2);  
+        HSSFCell cell2 = row2.createCell((short) 0);  
+        cell2.setCellValue("开始时间");  
+        cell2.setCellStyle(style); 
+        
+         cell2 = row2.createCell((short) 1);  
+        cell2.setCellValue(stlBillData.getBillStartTime());  
+        cell2.setCellStyle(style); 
+        
+        cell2 = row2.createCell((short) 2);  
+        cell2.setCellValue("结束时间");  
+        cell2.setCellStyle(style);
+        
+        cell2 = row2.createCell((short) 3);  
+        cell2.setCellValue(stlBillData.getBillEndTime());  
+        cell2.setCellStyle(style); 
+        
+        
+        HSSFRow row3 = sheet.createRow((int) 3);  
+        HSSFCell cell3 = row3.createCell((short) 0);  
+        cell3.setCellValue("结算金额(元)");  
+        cell3.setCellStyle(style); 
+        
+        cell3 = row3.createCell((short) 1);  
+        cell3.setCellValue(stlBillData.getOrigFee());  
+        cell3.setCellStyle(style); 
+        
+        
+        
+        HSSFRow row5 = sheet.createRow((int) 5);  
+        HSSFCell cell5 = row5.createCell((short) 0);  
+        cell5.setCellValue("科目ID");  
+        cell5.setCellStyle(style); 
+        cell5 = row5.createCell((short) 1);  
+        cell5.setCellValue("科目名称");  
+        cell5.setCellStyle(style); 
+        cell5 = row5.createCell((short) 2);  
+        cell5.setCellValue("总金额(元)");  
+        cell5.setCellStyle(style); 
+        
+        
+        HSSFRow row6 = sheet.createRow((int) 6);  
+        HSSFCell cell6 = row6.createCell((short) 0);  
+        cell6.setCellValue(stlBillData.getFeeItemId());  
+        cell6.setCellStyle(style); 
+        cell6 = row5.createCell((short) 1);  
+        cell6.setCellValue("科目名称");  
+        cell6.setCellStyle(style); 
+        cell6 = row5.createCell((short) 2);  
+        cell6.setCellValue(stlBillData.getOrigFee());  
+        cell6.setCellStyle(style); 
+        
+        
+        }
+  
+		
+		
 	}
 	
 

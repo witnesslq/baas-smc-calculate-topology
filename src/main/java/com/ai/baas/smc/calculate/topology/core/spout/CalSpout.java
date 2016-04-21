@@ -11,8 +11,11 @@ import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.ai.baas.smc.calculate.topology.core.bo.FinishListVo;
+import com.ai.baas.smc.calculate.topology.core.flow.CalFeesFlow;
 import com.ai.baas.smc.calculate.topology.core.util.SmcCacheConstant;
 import com.ai.baas.storm.util.HBaseProxy;
 import com.ai.opt.sdk.cache.factory.CacheClientFactory;
@@ -27,6 +30,8 @@ import backtype.storm.tuple.Fields;
 import backtype.storm.tuple.Values;
 
 public class CalSpout extends BaseRichSpout{
+	
+	private static Logger logger = LoggerFactory.getLogger(CalSpout.class);
 
 	 private SpoutOutputCollector collector;
 	 
@@ -42,8 +47,10 @@ public class CalSpout extends BaseRichSpout{
 
 	@Override
 	public void nextTuple() {
+		logger.error("spout开始..........");
 		ICacheClient cacheStatsTimes = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.STATS_TIMES);
 		String finishlist = cacheStatsTimes.get(SmcCacheConstant.Cache.finishKey);
+		logger.error("读取缓存结束..........");
 		List<FinishListVo> voList = JSON.parseArray(finishlist, FinishListVo.class);
 		for (FinishListVo vo : voList) {
 		String tenantId=vo.getTenantId();

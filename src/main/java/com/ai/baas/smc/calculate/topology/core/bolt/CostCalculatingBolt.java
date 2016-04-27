@@ -44,20 +44,18 @@ public class CostCalculatingBolt extends BaseBasicBolt {
 
 	@Override
 	public void prepare(Map stormConf, TopologyContext context) {
+		HbaseClient.loadResource(stormConf);
+		JdbcProxy.loadDefaultResource(stormConf);
 		mappingRules[0] = MappingRule.getMappingRule(MappingRule.FORMAT_TYPE_INPUT, BaseConstants.JDBC_DEFAULT);
 		mappingRules[1] = mappingRules[0];
 		calculateProxy = new CalculateProxy();
-		HbaseClient.loadResource(stormConf);
-		JdbcProxy.loadDefaultResource(stormConf);
-
-		super.prepare(stormConf, context);
-
+		//super.prepare(stormConf, context);
 	}
 
 	@Override
 	public void execute(Tuple input, BasicOutputCollector collector) {
-		 Map<String, String> data = null;
-		 
+		Map<String, String> data = null;
+
 		String line = "";
 		double value = 0;
 		String period = "";
@@ -67,79 +65,87 @@ public class CostCalculatingBolt extends BaseBasicBolt {
 		String batchNo = "";
 		String source = "";
 		try {
-			  String inputData = input.getString(0);
-	            LOG.info(" ====== 开始执行对账bolt，inputData = [" + inputData + "]");
-	            /* 1.获取并解析输入信息 */
-	            MessageParser messageParser = MessageParser.parseObject(inputData, mappingRules,
-	                    outputFields);
-	            data = messageParser.getData();
+			String inputData = input.getString(0);
+			System.out.println("input===" + inputData);
+			LOG.info(" ====== 开始执行对账bolt，inputData = [" + inputData + "]");
+			/* 1.获取并解析输入信息 */
+			MessageParser messageParser = MessageParser.parseObject(inputData,mappingRules, outputFields);
+			data = messageParser.getData();
+			System.out.println("data===" + data.toString());
 			batchNo = data.get(BaseConstants.BATCH_SERIAL_NUMBER);
 			period = data.get(BaseConstants.ACCOUNT_PERIOD);
 			source = data.get(BaseConstants.SOURCE);
 			tenantId = data.get(BaseConstants.TENANT_ID);
-			acctId =data.get(BaseConstants.ACCT_ID);
+			acctId = data.get(BaseConstants.ACCT_ID);
 
 			objectId = input.getStringByField("objectId");
-			List<StlPolicy> policyList = calculateProxy.getPolicyList(objectId, tenantId);
+			List<StlPolicy> policyList = calculateProxy.getPolicyList(objectId,tenantId);
+			//处理政策
 			for (StlPolicy stlPolicy : policyList) {
 				long elementId = stlPolicy.getStlElementId();
 				String stlObjectId = stlPolicy.getStlObjectId();
 				Long policyId = stlPolicy.getPolicyId();
 				String billStyleSn = stlPolicy.getBillStyleSn();
-				List<StlPolicyItem> policyItemList= calculateProxy.getStlPolicyItemLists(policyId,tenantId);
-				for(StlPolicyItem stlPolicyItem:policyItemList)
-				{
-				Long itemId=stlPolicyItem.getItemId();
-				List<StlPolicyItemCondition> stlPolicyItemConditionList = calculateProxy.getPolicyItemList(itemId,
-						tenantId);
-				List<StlPolicyItemPlan> stlPolicyItemPlanList = calculateProxy.getStlPolicyItemPlan(itemId, tenantId);
-				if (calculateProxy.matchPolicy(data, stlPolicyItemConditionList)) {
-					for (StlPolicyItemPlan stlPolicyItemPlan : stlPolicyItemPlanList) {
-						value = calculateProxy.caculateFees(stlPolicyItemPlan, data);
-						calculateProxy.dealBill(stlPolicy.getPolicyCode(), value, tenantId, batchNo, stlObjectId,
-								elementId, billStyleSn, period,stlPolicyItemPlan.getFeeItem());
-						line = line + BaseConstants.FIELD_SPLIT + value;
-						List<Object> values = null;
-						MessageParser.parseObject(line, mappingRules, outputFields);
-						String order_id = data.get("order_id");
-						values = messageParser.toTupleData();
-						if (CollectionUtils.isNotEmpty(values)) {
-							collector.emit(values);
+				List<StlPolicyItem> policyItemList = calculateProxy.getStlPolicyItemLists(policyId, tenantId);
+				//处理政策结算项
+				for (StlPolicyItem stlPolicyItem : policyItemList) {
+					Long itemId = stlPolicyItem.getItemId();
+					List<StlPolicyItemCondition> stlPolicyItemConditionList = calculateProxy.getPolicyItemList(itemId, tenantId);
+					List<StlPolicyItemPlan> stlPolicyItemPlanList = calculateProxy.getStlPolicyItemPlan(itemId, tenantId);
+					//匹配政策适配对象
+					if (calculateProxy.matchPolicy(data,stlPolicyItemConditionList)) {
+						for (StlPolicyItemPlan stlPolicyItemPlan : stlPolicyItemPlanList) {
+							value = calculateProxy.caculateFees(stlPolicyItemPlan, data);
+							calculateProxy.dealBill(stlPolicy.getPolicyCode(),
+									value, tenantId, batchNo, stlObjectId,
+									elementId, billStyleSn, period,
+									stlPolicyItemPlan.getFeeItem());
+							line = line + BaseConstants.FIELD_SPLIT + value;
+							List<Object> values = null;
+							MessageParser.parseObject(line, mappingRules,
+									outputFields);
+							String order_id = data.get("order_id");
+							values = messageParser.toTupleData();
+							if (CollectionUtils.isNotEmpty(values)) {
+								collector.emit(values);
+							}
+							String[] family = new String[0];
+							family[0] = "data";
+							long billDataId = calculateProxy.getBillDataId(stlPolicy.getPolicyCode());
+
+							// 行键
+							String row = tenantId + "_" + billDataId + "_"
+									+ period + "_" + objectId + "_" + source
+									+ "_" + order_id;
+
+							System.out.println("row===" + row);
+							HbaseClient.creatTable("stl_bill_detail_data_" + period, family);
+							HbaseClient.addRowByMap("stl_bill_detail_data_" + period, row, "data", messageParser.getData());
 						}
-						String[] family = new String[0];
-						family[0] = "data";
-						long billDataId = calculateProxy.getBillDataId(stlPolicy.getPolicyCode());
-						
-						//行键
-						String row = tenantId + "_" + billDataId + "_" + period + "_" + objectId + "_" + source + "_"
-								+ order_id;
-
-						HbaseClient.creatTable("stl_bill_detail_data_" + period, family);
-						HbaseClient.addRowByMap("stl_bill_detail_data_" + period, row, "data", messageParser.getData());
 					}
-
 				}
-			}
 			}
 			/**
 			 * 更新计数器
 			 */
-			ICacheClient cacheClient = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.CAL_COMMON_CACHE);
-			String counter = cacheClient.get(SmcCacheConstant.Cache.COUNTER);
-			counter = String.valueOf(Integer.parseInt(counter) + 1);
-			ICacheClient cacheStatsTimes = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.STATS_TIMES);
-			String finishlist = cacheStatsTimes.get(SmcCacheConstant.Cache.finishKey);
-			List<FinishListVo> voList = JSON.parseArray(finishlist, FinishListVo.class);
-			for (FinishListVo vo : voList) {
-				if (vo.getBatchNo().equals(batchNo)) {
-					if (vo.getStats_times().equals(counter)) {
-						calculateProxy.insertBillData("stl_bill_data_"+period,"stl_bill_item_data_"+period);
-					}
-				}
-
-			}
+//			ICacheClient cacheClient = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.CAL_COMMON_CACHE);
+//			String counter = cacheClient.get(SmcCacheConstant.Cache.COUNTER);
+//			counter = String.valueOf(Integer.parseInt(counter) + 1);
+//			//String counter = String.valueOf(cacheClient.incr(SmcCacheConstant.Cache.COUNTER));
+//			ICacheClient cacheStatsTimes = CacheClientFactory
+//					.getCacheClient(SmcCacheConstant.NameSpace.STATS_TIMES);
+//			String finishlist = cacheStatsTimes.get(SmcCacheConstant.Cache.finishKey);
+//			List<FinishListVo> voList = JSON.parseArray(finishlist, FinishListVo.class);
+//			for (FinishListVo vo : voList) {
+//				if (vo.getBatchNo().equals(batchNo)) {
+//					if (vo.getStats_times().equals(counter)) {
+//						calculateProxy.insertBillData("stl_bill_data_" + period, "stl_bill_item_data_" + period);
+//					}
+//				}
+//
+//			}
 		} catch (Exception e) {
-
+			e.printStackTrace();
 		}
 	}
 

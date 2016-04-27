@@ -2,7 +2,9 @@ package com.ai.baas.smc.calculate.topology.core.spout;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Connection;
@@ -14,20 +16,20 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.ai.baas.smc.calculate.topology.core.bo.FinishListVo;
-import com.ai.baas.smc.calculate.topology.core.flow.CalFeesFlow;
-import com.ai.baas.smc.calculate.topology.core.util.SmcCacheConstant;
-import com.ai.baas.storm.util.HBaseProxy;
-import com.ai.opt.sdk.cache.factory.CacheClientFactory;
-import com.ai.paas.ipaas.mcs.interfaces.ICacheClient;
-import com.alibaba.fastjson.JSON;
-
 import backtype.storm.spout.SpoutOutputCollector;
 import backtype.storm.task.TopologyContext;
 import backtype.storm.topology.OutputFieldsDeclarer;
 import backtype.storm.topology.base.BaseRichSpout;
 import backtype.storm.tuple.Fields;
 import backtype.storm.tuple.Values;
+
+import com.ai.baas.smc.calculate.topology.core.bo.FinishListVo;
+import com.ai.baas.smc.calculate.topology.core.util.SmcCacheConstant;
+import com.ai.baas.storm.util.HBaseProxy;
+import com.ai.opt.sdk.cache.factory.CacheClientFactory;
+import com.ai.opt.sdk.helper.OptConfHelper;
+import com.ai.paas.ipaas.mcs.interfaces.ICacheClient;
+import com.alibaba.fastjson.JSON;
 
 public class CalSpout extends BaseRichSpout{
 	
@@ -36,63 +38,74 @@ public class CalSpout extends BaseRichSpout{
 	 private SpoutOutputCollector collector;
 	 
 	 private static Connection connection;
+	 private int i=0;
 	
 	@Override
 	public void open(Map conf, TopologyContext context, SpoutOutputCollector collector) {
 		// TODO Auto-generated method stub
 		   HBaseProxy.loadResource(conf);
 		   connection=HBaseProxy.getConnection();
+		   Properties p=new Properties();
+		   p.setProperty("ccs.appname", "baas-smc");
+		   p.setProperty("ccs.zk_address", "10.1.130.84:39181");
+		   OptConfHelper.loadPaaSConf(p);
 		   this.collector = collector;
 	}
 
 	@Override
 	public void nextTuple() {
-		logger.error("spout开始..........");
+		if(i > 0){
+			return;
+		}
+		logger.debug("spout开始..........");
+		System.out.println("spout开始..........");
 		ICacheClient cacheStatsTimes = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.STATS_TIMES);
 		String finishlist = cacheStatsTimes.get(SmcCacheConstant.Cache.finishKey);
-		logger.error("读取缓存结束..........");
-		List<FinishListVo> voList = JSON.parseArray(finishlist, FinishListVo.class);
+		System.out.println("-->"+finishlist);
+		logger.debug("读取缓存结束..........");
+		System.out.println("读取缓存结束..........");
+		if(StringUtils.isBlank(finishlist)){
+			return;
+		}
+		List<FinishListVo> voList = JSON.parseArray(finishlist,FinishListVo.class);
+		System.out.println("-----------"+voList.size());
 		for (FinishListVo vo : voList) {
-		String tenantId=vo.getTenantId();
-		String batchNo=vo.getBatchNo();
-		String billTimeSn=vo.getBillTimeSn();
-		Scan scan = new Scan();
-		
-		try
-		{
-		Table table = connection.getTable(TableName.valueOf("RTM_OUTPUT_DETAIL_"+billTimeSn));
-		 ResultScanner rs = null;
-          
-		 rs = table.getScanner(scan);
-	      table.close();
-		for (Result r : rs) {// 按行去遍历
-			String line="";
-	        for (KeyValue kv : r.raw()) {// 遍历每一行的各列
-	        	if(Bytes.toString(kv.getQualifier()).equals("record"))
-	        	{
-	        		line=Bytes.toString(kv.getValue());
-	        		collector.emit(new Values(line));
-	        	}
-	          
-	        	
-	         
-	        }
-		}
-		}
-		catch(Exception e)
-		{
-			e.printStackTrace();
-		}
+			String tenantId = vo.getTenantId();
+			String batchNo = vo.getBatchNo();
+			//String billTimeSn = vo.getBillTimeSn();
+			String billTimeSn = "201604";
+			String objectId = vo.getObjectId();
+			Scan scan = new Scan();
 
-		
-		
+			try {
+				Table table = connection.getTable(TableName.valueOf("RTM_OUTPUT_DETAIL_SMC_" + billTimeSn));
+				ResultScanner rs = null;
+
+				rs = table.getScanner(scan);
+				table.close();
+				for (Result r : rs) {// 按行去遍历
+					String line = "";
+					for (KeyValue kv : r.raw()) {// 遍历每一行的各列
+						if (Bytes.toString(kv.getQualifier()).equals("record")) {
+							line = Bytes.toString(kv.getValue());
+							collector.emit(new Values(line,objectId));
+						}
+
+					}
+				}
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+
 		}
+		i++;
+		
 	}
 
 	@Override
 	public void declareOutputFields(OutputFieldsDeclarer declarer) {
 		// TODO Auto-generated method stub
-		 declarer.declare(new Fields("source"));
+		 declarer.declare(new Fields("source","objectId"));
 	}
 
 }

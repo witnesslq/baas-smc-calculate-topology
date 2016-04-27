@@ -30,9 +30,11 @@ import com.ai.baas.smc.calculate.topology.core.util.IKin;
 import com.ai.baas.smc.calculate.topology.core.util.SmcCacheConstant;
 import com.ai.baas.smc.calculate.topology.core.util.SmcSeqUtil;
 import com.ai.baas.storm.jdbc.JdbcProxy;
+import com.ai.baas.storm.util.BaseConstants;
 import com.ai.opt.sdk.cache.factory.CacheClientFactory;
 import com.ai.paas.ipaas.mcs.interfaces.ICacheClient;
 import com.alibaba.dubbo.common.json.ParseException;
+import com.alibaba.dubbo.common.utils.StringUtils;
 import com.alibaba.fastjson.JSON;
 import com.mysql.jdbc.Statement;
 
@@ -86,7 +88,7 @@ public class CalculateProxy {
 		List<StlPolicyItem> stlPolicyItemList = new ArrayList<StlPolicyItem>();
 		List<StlPolicyItem> policyList = JSON.parseArray(policyItemAll, StlPolicyItem.class);
 		for(StlPolicyItem stlPolicyItem:policyList){
-			if(stlPolicyItem.getPolicyId()==policyId&&stlPolicyItem.getTenantId().equals(tenantId))
+			if(stlPolicyItem.getPolicyId().longValue()==policyId.longValue()&&stlPolicyItem.getTenantId().equals(tenantId))
 			{
 				stlPolicyItemList.add(stlPolicyItem);
 			}
@@ -109,7 +111,7 @@ public class CalculateProxy {
 		List<StlPolicyItemCondition> stlPolicyItemConditionList = new ArrayList<StlPolicyItemCondition>();
 		List<StlPolicyItemCondition> policyList = JSON.parseArray(policyItemAll, StlPolicyItemCondition.class);
 		for (StlPolicyItemCondition stlPolicyItemCondition : policyList) {
-			if (stlPolicyItemCondition.getItemId() == itemId
+			if (stlPolicyItemCondition.getItemId().longValue() == itemId.longValue()
 					&& stlPolicyItemCondition.getTenantId().equals(tenantId)) {
 				stlPolicyItemConditionList.add(stlPolicyItemCondition);
 			}
@@ -124,7 +126,7 @@ public class CalculateProxy {
 		List<StlPolicyItemPlan> policyList = JSON.parseArray(policyItemAll, StlPolicyItemPlan.class);
 		for (int i = 0; i < policyList.size(); i++) {
 			StlPolicyItemPlan stlPolicyItemPlan = (StlPolicyItemPlan) policyList.get(i);
-			if (stlPolicyItemPlan.getItemId() == itemId && stlPolicyItemPlan.getTenantId().equals(tenantId)) {
+			if (stlPolicyItemPlan.getItemId().longValue() == itemId.longValue() && stlPolicyItemPlan.getTenantId().equals(tenantId)) {
 				stlPolicyItemPlanList.add(stlPolicyItemPlan);
 			}
 		}
@@ -151,17 +153,29 @@ public class CalculateProxy {
 	 * @param policyItemList
 	 * @return
 	 */
-	public boolean matchPolicy(Map data, List<StlPolicyItemCondition> policyItemList) {
-
-		boolean flag = true;
-		 ICacheClient elementcacheClient = CacheClientFactory
-	                .getCacheClient(SmcCacheConstant.NameSpace.ELEMENT_CACHE);
-
+	public boolean matchPolicy(Map<String,String> data, List<StlPolicyItemCondition> policyItemList) {
+		boolean flag = false;
+		ICacheClient elementcacheClient = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.ELEMENT_CACHE);
 		for (StlPolicyItemCondition stlPolicyItemCondition : policyItemList) {
+			StringBuilder elementStr = new StringBuilder();
+			elementStr.append(stlPolicyItemCondition.getTenantId());
+			elementStr.append(".");
+			elementStr.append(String.valueOf(stlPolicyItemCondition.getElementId()));
+			
 			String matchType = stlPolicyItemCondition.getMatchType();
 			String matchValue = stlPolicyItemCondition.getMatchValue();
-	
-			String compare =(String)data.get("content");
+			
+			//String compare =(String)data.get("content");
+			String elementJson = elementcacheClient.get(elementStr.toString());
+			if(StringUtils.isBlank(elementJson)){
+				break;
+			}
+			StlElement stlElement = JSON.parseObject(elementJson, StlElement.class);
+			if("statistics".equalsIgnoreCase(stlElement.getAttrType())){
+				continue;
+			}
+			String elementCode = stlElement.getElementCode();
+			String compare = data.get(elementCode);
 
 			if (matchType.equals("in")) {
 				flag = IKin.in(matchValue, compare);
@@ -169,6 +183,9 @@ public class CalculateProxy {
 			} else if (matchType.equals("nin")) {
 				flag = !IKin.in(matchValue, compare);
 			} else {
+				if(matchType.equals("=")){
+					matchType = "==";
+				}
 				String expression = "a" + matchType + "b";
 				List<Variable> variables = new ArrayList<Variable>();
 				variables.add(Variable.createVariable("a", compare));
@@ -176,8 +193,13 @@ public class CalculateProxy {
 				Object result = ExpressionEvaluator.evaluate(expression, variables);
 				flag = Boolean.parseBoolean(result.toString());
 			}
+			
+			if(!flag){
+				break;
+			}
 		}
 
+		System.out.println("flag====="+flag);
 		return flag;
 	}
 
@@ -288,7 +310,7 @@ public class CalculateProxy {
 	public synchronized  void dealBill(String policyCode, double value, String tenantId, String batchNo, String objectId,
 			long elementId, String billStyle, String billTime,String feeItemId) {
 		ICacheClient billClient = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.BILL_CACHE);
-		String billAll = billClient.get("bill");
+		String billAll = billClient.get("bill");//租户+政策+账期+批次号+科目..................
 		List<StlBillData> dataList = JSON.parseArray(billAll, StlBillData.class);
 		if (!contains(policyCode, dataList)) {
 			StlBillData stlBillData = new StlBillData();

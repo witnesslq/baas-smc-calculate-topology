@@ -30,6 +30,8 @@ public class StlPolicy {
     private String stlObjectId;
 
     private Long stlElementId;
+    
+    private String stlElementSn;
 
     private String billStyleSn;
 
@@ -232,4 +234,15 @@ public class StlPolicy {
     public void setUpdateTime(Timestamp updateTime) {
         this.updateTime = updateTime;
     }
+
+	public String getStlElementSn() {
+		return stlElementSn;
+	}
+
+	public void setStlElementSn(String stlElementSn) {
+		this.stlElementSn = stlElementSn;
+	}
+    
+    
+    
 }

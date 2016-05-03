@@ -6,7 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.ai.baas.smc.calculate.topology.core.bolt.UnpackingBolt;
-import com.ai.baas.smc.calculate.topology.core.util.BmcConstants;
+import com.ai.baas.smc.calculate.topology.core.util.SmcConstants;
 import com.ai.baas.storm.flow.BaseFlow;
 import com.ai.baas.storm.util.BaseConstants;
 
@@ -22,11 +22,11 @@ public class GPRSGeneralFlow extends BaseFlow {
 	@Override
 	@SuppressWarnings("unchecked")
 	public void define() {
-		super.setKafkaSpout();
-		Map<String,String> outputFieldMapping = (Map<String,String>)conf.get("bmc.gprs.bolt.output.field");
-		builder.setBolt(BmcConstants.UNPACKING_BOLT, new UnpackingBolt(outputFieldMapping.get(BmcConstants.UNPACKING_BOLT)), 1).shuffleGrouping(BaseConstants.KAFKA_SPOUT_NAME);
-		//builder.setBolt("duplicate-checking", new DuplicateCheckingBolt(outputFieldMapping.get(BmcConstants.DUPLICATE_CHECKING_BOLT)), 1).shuffleGrouping(BmcConstants.UNPACKING_BOLT);
-		
+//		super.setKafkaSpout();
+//		Map<String,String> outputFieldMapping = (Map<String,String>)conf.get("bmc.gprs.bolt.output.field");
+//		builder.setBolt(SmcConstants.UNPACKING_BOLT, new UnpackingBolt(outputFieldMapping.get(SmcConstants.UNPACKING_BOLT)), 1).shuffleGrouping(BaseConstants.KAFKA_SPOUT_NAME);
+//		//builder.setBolt("duplicate-checking", new DuplicateCheckingBolt(outputFieldMapping.get(BmcConstants.DUPLICATE_CHECKING_BOLT)), 1).shuffleGrouping(BmcConstants.UNPACKING_BOLT);
+//		
 		
 		
 	}

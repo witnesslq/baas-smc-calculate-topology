@@ -1,6 +1,7 @@
 package com.ai.baas.smc.calculate.topology.core.bo;
 
 import java.sql.Timestamp;
+import java.util.List;
 
 public class StlBillData {
     private Long billId;
@@ -27,7 +28,7 @@ public class StlBillData {
 
     private Timestamp billEndTime;
 
-    private Float origFee;
+    private Double origFee;
 
     private String checkState;
 
@@ -57,6 +58,7 @@ public class StlBillData {
 
     private String yyyyMm;
     
+    private List<StlBillItemData> itemDatas;
     
     private String feeItemId;
 
@@ -145,7 +147,7 @@ public class StlBillData {
     }
 
     public void setBillTimeSn(String billTimeSn) {
-        this.billTimeSn = billTimeSn == null ? null : billTimeSn.trim();
+        this.billTimeSn = billTimeSn == null ? "" : billTimeSn.trim();
     }
 
     public Timestamp getBillStartTime() {
@@ -164,15 +166,15 @@ public class StlBillData {
         this.billEndTime = billEndTime;
     }
 
-    public Float getOrigFee() {
-        return origFee;
-    }
+    public Double getOrigFee() {
+		return origFee;
+	}
 
-    public void setOrigFee(Float origFee) {
-        this.origFee = origFee;
-    }
+	public void setOrigFee(Double origFee) {
+		this.origFee = origFee;
+	}
 
-    public String getCheckState() {
+	public String getCheckState() {
         return checkState;
     }
 
@@ -283,4 +285,16 @@ public class StlBillData {
     public void setYyyyMm(String yyyyMm) {
         this.yyyyMm = yyyyMm;
     }
+
+	public List<StlBillItemData> getItemDatas() {
+		return itemDatas;
+	}
+
+	public void setItemDatas(List<StlBillItemData> itemDatas) {
+		this.itemDatas = itemDatas;
+	}
+
+	
+    
+    
 }

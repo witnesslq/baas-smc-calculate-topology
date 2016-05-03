@@ -37,9 +37,9 @@ import com.ai.opt.sdk.helper.OptConfHelper;
 import com.ai.paas.ipaas.mcs.interfaces.ICacheClient;
 import com.alibaba.fastjson.JSON;
 
-public class CalSpout extends BaseRichSpout{
+public class CalSpoutTest extends BaseRichSpout{
 	
-	private static Logger logger = LoggerFactory.getLogger(CalSpout.class);
+	private static Logger logger = LoggerFactory.getLogger(CalSpoutTest.class);
 
 	 private SpoutOutputCollector collector;
 	 //private static Connection connection;
@@ -60,32 +60,39 @@ public class CalSpout extends BaseRichSpout{
 
 	@Override
 	public void nextTuple() {
-		//logger.debug("spout开始..........");
-		//System.out.println("spout开始..........");
+		if(i > 0){
+			return;
+		}
+		logger.debug("spout开始..........");
+		System.out.println("spout开始..........");
 		ICacheClient cacheStatsTimes = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.STATS_TIMES);
 		String finishlist = cacheStatsTimes.get(SmcCacheConstant.Cache.finishKey);
-		//System.out.println("-->"+finishlist);
-		//logger.debug("读取缓存结束..........");
-		//System.out.println("读取缓存结束..........");
+		System.out.println("-->"+finishlist);
+		logger.debug("读取缓存结束..........");
+		System.out.println("读取缓存结束..........");
 		if(StringUtils.isBlank(finishlist)){
 			return;
 		}
 		List<FinishListVo> voList = JSON.parseArray(finishlist,FinishListVo.class);
 		System.out.println("-----------"+voList.size());
-		cacheStatsTimes.del(SmcCacheConstant.Cache.finishKey);
+		
 		for (FinishListVo vo : voList) {
 			String tenantId = vo.getTenantId();
 			String batchNo = vo.getBatchNo();
 			//String billTimeSn = vo.getBillTimeSn();
 			String billTimeSn = "201604";
 			String objectId = vo.getObjectId();
-			cacheStatsTimes.hset(SmcCacheConstant.Cache.lockKey, batchNo, vo.getStats_times());	
+			
+//			StringBuilder bsnStr = new StringBuilder();
+//			bsnStr.append("JS");
+//			bsnStr.append(tenantId);
+//			bsnStr.append(batchNo);	
 			try {
 				Table table = HBaseProxy.getConnection().getTable(TableName.valueOf("RTM_OUTPUT_DETAIL_" + billTimeSn));
 				Scan scan = new Scan();
 				scan.setFilter(new SingleColumnValueFilter("bsn".getBytes(),
 						"value".getBytes(), CompareFilter.CompareOp.EQUAL,
-						new BinaryComparator(batchNo.getBytes())));
+						new BinaryComparator("JSBIUGZT20160301118".getBytes())));
 				ResultScanner rs = table.getScanner(scan);
 				for (Result r : rs) {// 按行去遍历
 					String line = "";
@@ -93,7 +100,7 @@ public class CalSpout extends BaseRichSpout{
 						if (Bytes.toString(kv.getQualifier()).equals("record")) {
 							line = Bytes.toString(kv.getValue());
 							//System.out.println("---"+line);
-							collector.emit(new Values(line,objectId));
+							//collector.emit(new Values(line,objectId));
 						}
 					}
 				}
@@ -102,7 +109,13 @@ public class CalSpout extends BaseRichSpout{
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
+			//test ........................................
+			break;
+			//test
+
 		}
+		i++;
+		
 	}
 
 	@Override
@@ -110,5 +123,6 @@ public class CalSpout extends BaseRichSpout{
 		// TODO Auto-generated method stub
 		 declarer.declare(new Fields("source","objectId"));
 	}
+	
 
 }

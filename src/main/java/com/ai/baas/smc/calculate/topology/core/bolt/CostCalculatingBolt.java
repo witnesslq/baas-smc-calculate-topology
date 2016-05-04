@@ -2,6 +2,7 @@ package com.ai.baas.smc.calculate.topology.core.bolt;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
@@ -19,28 +20,23 @@ import com.ai.baas.smc.calculate.topology.core.bo.StlPolicyItemCondition;
 import com.ai.baas.smc.calculate.topology.core.bo.StlPolicyItemPlan;
 import com.ai.baas.smc.calculate.topology.core.proxy.CalculateProxy;
 import com.ai.baas.smc.calculate.topology.core.util.SmcCacheConstant;
+import com.ai.baas.smc.calculate.topology.core.util.SmcConstants;
 import com.ai.baas.storm.jdbc.JdbcProxy;
 import com.ai.baas.storm.message.MappingRule;
 import com.ai.baas.storm.message.MessageParser;
 import com.ai.baas.storm.util.BaseConstants;
 import com.ai.baas.storm.util.HBaseProxy;
 import com.ai.opt.sdk.cache.factory.CacheClientFactory;
+import com.ai.opt.sdk.helper.OptConfHelper;
 import com.ai.paas.ipaas.mcs.interfaces.ICacheClient;
 import com.google.common.base.Joiner;
 
 public class CostCalculatingBolt extends BaseBasicBolt {
-	
-	   private static final Logger LOG = LoggerFactory.getLogger(CostCalculatingBolt.class);
-
+	private static final Logger LOG = LoggerFactory.getLogger(CostCalculatingBolt.class);
 	private static final long serialVersionUID = -3214008757998306486L;
-
 	private CalculateProxy calculateProxy;
-
 	private MappingRule[] mappingRules = new MappingRule[2];
-
 	private String[] outputFields;
-	
-	
 
 	@Override
 	public void prepare(Map stormConf, TopologyContext context) {
@@ -49,17 +45,21 @@ public class CostCalculatingBolt extends BaseBasicBolt {
 		HBaseProxy.loadResource(stormConf);
 		mappingRules[0] = MappingRule.getMappingRule(MappingRule.FORMAT_TYPE_INPUT, BaseConstants.JDBC_DEFAULT);
 		mappingRules[1] = mappingRules[0];
-		
+		loadCacheResource(stormConf);
 		calculateProxy = new CalculateProxy(stormConf);
 		//super.prepare(stormConf, context);
-		
 	}
-
+	
+	private void loadCacheResource(Map<String,String> config){
+		Properties p=new Properties();
+		p.setProperty(SmcConstants.CCS_APPNAME, config.get(SmcConstants.CCS_APPNAME));
+		p.setProperty(SmcConstants.CCS_ZK_ADDRESS, config.get(SmcConstants.CCS_ZK_ADDRESS));
+		OptConfHelper.loadPaaSConf(p);
+	}
+	
 	@Override
 	public void execute(Tuple input, BasicOutputCollector collector) {
 		Map<String, String> data = null;
-
-		String line = "";
 		double value = 0;
 		String period = "";
 		String tenantId = "";
@@ -69,16 +69,16 @@ public class CostCalculatingBolt extends BaseBasicBolt {
 		String source = "";
 		String bsn = "";
 		try {
-			String inputData = input.getString(0);
+			String inputData = input.getStringByField("line");
 			//System.out.println("input===" + inputData);
 			//LOG.info(" ====== 开始执行对账bolt，inputData = [" + inputData + "]");
-			/* 1.获取并解析输入信息 */
 			MessageParser messageParser = MessageParser.parseObject(inputData,mappingRules, outputFields);
 			data = messageParser.getData();
 			//System.out.println("data===" + data.toString());
 			batchNo = StringUtils.defaultString(data.get("batch_no"));
 			bsn = data.get(BaseConstants.BATCH_SERIAL_NUMBER);
-			period = StringUtils.substring(data.get(BaseConstants.ACCOUNT_PERIOD), 0, 6);
+			//period = StringUtils.substring(data.get(BaseConstants.ACCOUNT_PERIOD), 0, 6);
+			period = "201604";
 			source = "sys";
 			tenantId = data.get(BaseConstants.TENANT_ID);
 			acctId = data.get(BaseConstants.ACCT_ID);
@@ -113,28 +113,19 @@ public class CostCalculatingBolt extends BaseBasicBolt {
 
 							// 行键
 							//租户ID_账单ID_账期ID_数据对象_账单来源_流水ID
-							//需要增加政策ID
 							String row = Joiner.on(BaseConstants.COMMON_JOINER)
 									.join(tenantId, billDataId, period,
 											objectId, source, order_id);
 							
-//							String row = tenantId + "_" + billDataId + "_"
-//									+ period + "_" + objectId + "_" + source
-//									+ "_" + order_id;
-							
-							//System.out.println("row===" + row);
+							System.out.println("row===" + row+",bill_id="+billDataId);
 							data.put("bill_id", billDataId);
 							data.put("object_id",objectId);
 							data.put("bill_from","sys");
-							//String stlOrderDataKey = 
 							
 							data.put("stl_order_data_key", Joiner.on(BaseConstants.COMMON_JOINER).join(tenantId,batchNo,objectId,order_id));
 							calculateProxy.outputDetailBill(period, row, data);
 							
-							System.out.println("bill_id="+billDataId);
-							//HbaseClient.creatTable("stl_bill_detail_data_" + period, family);
-							//HbaseClient.addRowByMap("stl_bill_detail_data_" + period, row, "data", messageParser.getData());
-							//HbaseClient.addRowByMap("stl_bill_detail_data_" + period, row, "col_def", data);
+							//System.out.println("bill_id="+billDataId);
 						}
 					}
 				}
@@ -147,7 +138,7 @@ public class CostCalculatingBolt extends BaseBasicBolt {
 			String counter = String.valueOf(cacheClient.hincrBy(SmcCacheConstant.Cache.COUNTER,bsn,1));
 			String original = StringUtils.defaultString(cacheClient.hget(SmcCacheConstant.Cache.lockKey,bsn));
 			if(original.equals(counter)){
-				calculateProxy.insertBillData("stl_bill_data_" + period, "stl_bill_item_data_" + period,bsn);
+				calculateProxy.insertBillData(period, bsn);
 				System.out.println("需要插入账单表喽。。。");
 			}
 			

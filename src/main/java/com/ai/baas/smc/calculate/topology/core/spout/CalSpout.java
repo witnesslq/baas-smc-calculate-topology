@@ -3,12 +3,10 @@ package com.ai.baas.smc.calculate.topology.core.spout;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
-import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
@@ -16,7 +14,6 @@ import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.filter.BinaryComparator;
 import org.apache.hadoop.hbase.filter.CompareFilter;
 import org.apache.hadoop.hbase.filter.SingleColumnValueFilter;
-import org.apache.hadoop.hbase.filter.SubstringComparator;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,10 +24,10 @@ import backtype.storm.topology.OutputFieldsDeclarer;
 import backtype.storm.topology.base.BaseRichSpout;
 import backtype.storm.tuple.Fields;
 import backtype.storm.tuple.Values;
-import backtype.storm.utils.Time;
 
 import com.ai.baas.smc.calculate.topology.core.bo.FinishListVo;
 import com.ai.baas.smc.calculate.topology.core.util.SmcCacheConstant;
+import com.ai.baas.smc.calculate.topology.core.util.SmcConstants;
 import com.ai.baas.storm.util.HBaseProxy;
 import com.ai.opt.sdk.cache.factory.CacheClientFactory;
 import com.ai.opt.sdk.helper.OptConfHelper;
@@ -38,24 +35,25 @@ import com.ai.paas.ipaas.mcs.interfaces.ICacheClient;
 import com.alibaba.fastjson.JSON;
 
 public class CalSpout extends BaseRichSpout{
-	
+	private static final long serialVersionUID = 5296876971073823644L;
 	private static Logger logger = LoggerFactory.getLogger(CalSpout.class);
-
-	 private SpoutOutputCollector collector;
-	 //private static Connection connection;
-	 private int i=0;
+	private SpoutOutputCollector collector;
+	// private static Connection connection;
 	
 	@Override
 	public void open(Map conf, TopologyContext context, SpoutOutputCollector collector) {
-		// TODO Auto-generated method stub
 		//System.out.println("open--------------");
-		   HBaseProxy.loadResource(conf);
-		   HBaseProxy.getConnection();
-		   Properties p=new Properties();
-		   p.setProperty("ccs.appname", "baas-smc");
-		   p.setProperty("ccs.zk_address", "10.1.130.84:39181");
-		   OptConfHelper.loadPaaSConf(p);
-		   this.collector = collector;
+		HBaseProxy.loadResource(conf);
+		HBaseProxy.getConnection();
+		loadCacheResource(conf);
+		this.collector = collector;
+	}
+	
+	private void loadCacheResource(Map<String,String> config){
+		Properties p=new Properties();
+		p.setProperty(SmcConstants.CCS_APPNAME, config.get(SmcConstants.CCS_APPNAME));
+		p.setProperty(SmcConstants.CCS_ZK_ADDRESS, config.get(SmcConstants.CCS_ZK_ADDRESS));
+		OptConfHelper.loadPaaSConf(p);
 	}
 
 	@Override
@@ -76,10 +74,11 @@ public class CalSpout extends BaseRichSpout{
 		for (FinishListVo vo : voList) {
 			String tenantId = vo.getTenantId();
 			String batchNo = vo.getBatchNo();
-			//String billTimeSn = vo.getBillTimeSn();
-			String billTimeSn = "201604";
+			String billTimeSn = vo.getBillTimeSn();
+			System.out.println("---------------------"+vo.getBillTimeSn());
+			//String billTimeSn = "201605";
 			String objectId = vo.getObjectId();
-			cacheStatsTimes.hset(SmcCacheConstant.Cache.lockKey, batchNo, vo.getStats_times());	
+			cacheStatsTimes.hset(SmcCacheConstant.Cache.lockKey, batchNo, vo.getStats_times());
 			try {
 				Table table = HBaseProxy.getConnection().getTable(TableName.valueOf("RTM_OUTPUT_DETAIL_" + billTimeSn));
 				Scan scan = new Scan();
@@ -108,7 +107,7 @@ public class CalSpout extends BaseRichSpout{
 	@Override
 	public void declareOutputFields(OutputFieldsDeclarer declarer) {
 		// TODO Auto-generated method stub
-		 declarer.declare(new Fields("source","objectId"));
+		 declarer.declare(new Fields("line","objectId"));
 	}
 
 }

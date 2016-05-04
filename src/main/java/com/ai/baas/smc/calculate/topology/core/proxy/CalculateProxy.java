@@ -65,7 +65,7 @@ import com.ai.baas.storm.util.BaseConstants;
 import com.ai.baas.storm.util.HBaseProxy;
 import com.ai.opt.sdk.cache.factory.CacheClientFactory;
 import com.ai.paas.ipaas.mcs.interfaces.ICacheClient;
-import com.alibaba.dubbo.common.json.ParseException;
+
 import com.alibaba.fastjson.JSON;
 import com.google.common.base.Joiner;
 import com.google.gson.JsonElement;
@@ -103,12 +103,6 @@ public class CalculateProxy {
 		}
 		SeqDataSourceLoader.initDefault(config);
 	}
-	
-	
-	public String cal(String[] stream) {
-
-		return null;
-	}
 
 	/**
 	 * 根据对象类型获取该对象下有效政策
@@ -118,7 +112,7 @@ public class CalculateProxy {
 	 * @return
 	 * @throws ParseException
 	 */
-	public List<StlPolicy> getPolicyList(String objectId, String tenantId) throws ParseException {
+	public List<StlPolicy> getPolicyList(String objectId, String tenantId) throws Exception {
 		// TODO Auto-generated method stub
 		ICacheClient cacheClient = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.POLICY_CACHE);
 		String policyAll = cacheClient.get(SmcCacheConstant.POLICY_ALL);
@@ -164,7 +158,7 @@ public class CalculateProxy {
 	 * @return
 	 * @throws ParseException
 	 */
-	public List<StlPolicyItemCondition> getPolicyItemList(Long itemId, String tenantId) throws ParseException {
+	public List<StlPolicyItemCondition> getPolicyItemList(Long itemId, String tenantId) throws Exception {
 		// TODO Auto-generated method stub
 		ICacheClient cacheClient = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.POLICY_CACHE);
 		String policyItemAll = cacheClient.get(SmcCacheConstant.POLICY_ITEM_CONDITION);
@@ -193,17 +187,17 @@ public class CalculateProxy {
 		return stlPolicyItemPlanList;
 	}
 
-	public List getParamList() {
-		IDshmClient client = null;
-		if (client == null)
-			client = new DshmClient();
-		ICacheClient cacheClient = CacheFactoryUtil.getCacheClient(CacheBLMapper.CACHE_BL_CAL_PARAM);
-		Map<String, String> params = new TreeMap<String, String>();
-		params.put("price_code", "999");
-		params.put("tenant_id", "VIV-BYD");
-		List<Map<String, String>> results = client.list("cp_price_info").where(params).executeQuery(cacheClient);
-		return results;
-	}
+//	public List getParamList() {
+//		IDshmClient client = null;
+//		if (client == null)
+//			client = new DshmClient();
+//		ICacheClient cacheClient = CacheFactoryUtil.getCacheClient(CacheBLMapper.CACHE_BL_CAL_PARAM);
+//		Map<String, String> params = new TreeMap<String, String>();
+//		params.put("price_code", "999");
+//		params.put("tenant_id", "VIV-BYD");
+//		List<Map<String, String>> results = client.list("cp_price_info").where(params).executeQuery(cacheClient);
+//		return results;
+//	}
 
 	/**
 	 * 是否匹配规则
@@ -271,19 +265,19 @@ public class CalculateProxy {
 		return flag;
 	}
 
-	public Map valueMap(String[] stream, List paramList) {
-		Map map = new HashMap();
-		for (int i = 0; i < stream.length; i++) {
-			for (int j = 0; j < paramList.size(); j++) {
-				Map paramMap = (Map) paramList.get(j);
-				if (paramMap.containsKey(i)) {
-					map.put(paramMap.get(i), stream[i]);
-				}
-			}
-		}
-		return map;
-
-	}
+//	public Map valueMap(String[] stream, List paramList) {
+//		Map map = new HashMap();
+//		for (int i = 0; i < stream.length; i++) {
+//			for (int j = 0; j < paramList.size(); j++) {
+//				Map paramMap = (Map) paramList.get(j);
+//				if (paramMap.containsKey(i)) {
+//					map.put(paramMap.get(i), stream[i]);
+//				}
+//			}
+//		}
+//		return map;
+//
+//	}
 
 	public double caculateFees(StlPolicyItemPlan stlPolicyItemPlan, Map<String,String> data) {
 		double value = docaculate(stlPolicyItemPlan, data);
@@ -406,7 +400,7 @@ public class CalculateProxy {
 			stlBillData.setStlElementId(elementId);
 			stlBillData.setStlElementSn(elementSn);
 			stlBillData.setBillStyleSn(billStyle);
-			stlBillData.setOrigFee(new Double(value));
+			stlBillData.setOrigFee(new Double(0));
 			//stlBillData.setFeeItemId(feeItemId);
 			//stlBillData.setBillId(Long.parseLong(SmcSeqUtil.getRandom()));
 			stlBillData.setBillId(SeqUtil.getNewId(SmcConstants.STL_BILL_DATA$BILL_ID$SEQ));
@@ -417,9 +411,10 @@ public class CalculateProxy {
 			stlBillData.setItemDatas(new ArrayList<StlBillItemData>());
 		}else{
 			stlBillData = JSON.parseObject(billAll, StlBillData.class);
-			double fee = stlBillData.getOrigFee().doubleValue() + value;
-			stlBillData.setOrigFee(fee);
+//			double fee = stlBillData.getOrigFee().doubleValue() + value;
+//			stlBillData.setOrigFee(fee);
 		}
+		billClient.hincrByFloat(SmcCacheConstant.Cache.BILL_DATA_PREFIX+bsn, policyId, value);
 		List<StlBillItemData> itemDatas = stlBillData.getItemDatas();
 		if (!contains(itemDatas, feeItemId, value)) {
 			StlBillItemData stlBillItemData = new StlBillItemData();
@@ -427,45 +422,20 @@ public class CalculateProxy {
 			stlBillItemData.setTenantId(stlBillData.getTenantId());
 			stlBillItemData.setItemType("1");
 			stlBillItemData.setFeeItemId(feeItemId);
-			stlBillItemData.setTotalFee(new Double(value));
+			stlBillItemData.setTotalFee(new Double(0));
 			itemDatas.add(stlBillItemData);
 		}
+		billClient.hincrByFloat(SmcCacheConstant.Cache.BILL_ITEM_DATA_PREFIX+bsn, policyId+":"+feeItemId, value);
 		//billClient.set(getCacheBillTable(policyId), JSON.toJSONString(stlBillData));
 		billClient.hset(getCacheBillTable(bsn), policyId, JSON.toJSONString(stlBillData));
 		return stlBillData.getBillId().toString();
-//		List<StlBillData> dataList = null;
-//		if(StringUtils.isBlank(billAll)){
-//			dataList = new ArrayList<StlBillData>();
-//		}else{
-//			dataList = JSON.parseArray(billAll, StlBillData.class);
-//		}
-//		if (!contains(policyCode, dataList)) {
-//			StlBillData stlBillData = new StlBillData();
-//			stlBillData.setPolicyCode(policyCode);
-//			stlBillData.setTenantId(tenantId);
-//			stlBillData.setBatchNo(batchNo);
-//			stlBillData.setStlObjectId(objectId);
-//			stlBillData.setStlElementId(elementId);
-//			stlBillData.setBillStyleSn(billStyle);
-//			stlBillData.setOrigFee(new Double(value));
-//			stlBillData.setFeeItemId(feeItemId);
-//			stlBillData.setBillId(Long.parseLong(SmcSeqUtil.getRandom()));
-//			dataList.add(stlBillData);
-//		} else {
-//			for (StlBillData stlBillData : dataList) {
-//				if (stlBillData.getPolicyCode().equals(policyCode)) {
-//					stlBillData.setOrigFee(stlBillData.getOrigFee() + Float.parseFloat(String.valueOf(value)));
-//				}
-//			}
-//		}
-//		billClient.set(getCacheBillKey(policyCode), JSON.toJSONString(dataList));
 	}
 
 	boolean contains(List<StlBillItemData> itemDatas, String feeItemId, double value){
 		for (StlBillItemData stlBillItemData : itemDatas) {
 			if(feeItemId.equals(stlBillItemData.getFeeItemId())){
-				double addup = stlBillItemData.getTotalFee().doubleValue() + value;
-				stlBillItemData.setTotalFee(new Double(addup));
+//				double addup = stlBillItemData.getTotalFee().doubleValue() + value;
+//				stlBillItemData.setTotalFee(new Double(addup));
 				return true;
 			}
 		}
@@ -485,7 +455,7 @@ public class CalculateProxy {
 	
 	private String getCacheBillTable(String batchNo){
 		StringBuilder billKey = new StringBuilder();
-		billKey.append("smc_bill_").append(batchNo);
+		billKey.append(SmcCacheConstant.Cache.BILL_PREFIX).append(batchNo);
 		return billKey.toString();	
 	}
 	
@@ -520,52 +490,48 @@ public class CalculateProxy {
 	}
 	
 	
-	public void insertBillData(String tableName,String itemTableName,String batchNo) throws Exception
+	public void insertBillData(String period,String bsn) throws Exception
 	{
 		ICacheClient billClient = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.BILL_CACHE);
-		Map<String,String> billMaps = billClient.hgetAll("smc_bill_"+batchNo);
+		Map<String,String> billMaps = billClient.hgetAll(SmcCacheConstant.Cache.BILL_PREFIX+bsn);
 		int opt_times = 0;
 		StlBillData stlBillData = null;
-		for(String bill:billMaps.values()){
-			stlBillData = JSON.parseObject(bill, StlBillData.class);
-			if(insert(stlBillData,tableName,itemTableName)){
+		//for(String bill:billMaps.values()){
+		for (Entry<String, String> entry : billMaps.entrySet()) {
+			stlBillData = JSON.parseObject(entry.getValue(), StlBillData.class);
+			if(insert(stlBillData,period,entry.getKey(),bsn,billClient)){
 				opt_times++;
 			}
 		}
 		if(billMaps.size() == opt_times){
 			//导出文件
-			
-			billClient.del("smc_bill_"+batchNo);
-			billClient.hdel(SmcCacheConstant.Cache.lockKey, batchNo);
-			billClient.hdel(SmcCacheConstant.Cache.COUNTER, batchNo);
+			billClient.del(SmcCacheConstant.Cache.BILL_PREFIX+bsn);
+			billClient.del(SmcCacheConstant.Cache.BILL_DATA_PREFIX+bsn);
+			billClient.del(SmcCacheConstant.Cache.BILL_ITEM_DATA_PREFIX+bsn);
+			billClient.hdel(SmcCacheConstant.Cache.lockKey, bsn);
+			billClient.hdel(SmcCacheConstant.Cache.COUNTER, bsn);
 		}
 	}
 	
-	public boolean insert(StlBillData stlBillData,String tableName,String itemTableName){
+	public boolean insert(StlBillData stlBillData,String period,String policyId,String bsn,ICacheClient client){
 		Connection conn = null;
 		boolean isSucc = false;
 		try{
 			conn = JdbcProxy.getConnection(BaseConstants.JDBC_DEFAULT);
 			conn.setAutoCommit(false);
 			String createTime = DateFormatUtils.format(new Date(), "yyyyMMddHHmmss");
-			Statement st = (Statement)conn.createStatement();
-			String sql = "insert into "+tableName+"(bill_id,bill_from,batch_no,tenant_id,policy_code,stl_object_id,"
-			 		+ "stl_element_id,stl_element_sn,bill_style_sn,bill_time_sn,bill_start_time,bill_end_time,orig_fee,create_time) values("+stlBillData.getBillId()+",'"+
-					 stlBillData.getBillFrom()+"','"+stlBillData.getBatchNo()+"','"+stlBillData.getTenantId()+"','"+stlBillData.getPolicyCode()+"','"+
-			 		stlBillData.getStlObjectId()+"',"+stlBillData.getStlElementId()+",'"+stlBillData.getStlElementSn()+"','"+stlBillData.getBillStyleSn()+"',"+
-					 stlBillData.getBillTimeSn()+",'"+stlBillData.getBillStartTime()+"','"+stlBillData.getBillEndTime()+"',"+stlBillData.getOrigFee()+","+createTime+")";
-	        System.out.println("sql="+sql);
-	        int result = st.executeUpdate(sql);
+			Statement statement = (Statement)conn.createStatement();
+			String origFee = client.hget(SmcCacheConstant.Cache.BILL_DATA_PREFIX+bsn, policyId);
+			//System.out.println("origFee=="+origFee);
+			insertBillData(stlBillData, period, createTime, statement, origFee);
 	        List<StlBillItemData> itemDatas = stlBillData.getItemDatas();
-	        String itemSql = "";
-	        String billItemId = ObjectUtils.toString(SeqUtil.getNewId(SmcConstants.STL_BILL_ITEM_DATA$BILL_ITEM_ID$SEQ),SmcSeqUtil.getRandom());
+	        String billId = stlBillData.getBillId().toString();
+	        String totalFee = "0";
 	        for(StlBillItemData itemData:itemDatas){
-	        	itemSql = "insert into "+itemTableName+"(bill_item_id,bill_id,tenant_id,item_type,fee_item_id,total_fee,create_time) "
-	     		 		+ " values("+billItemId+","+stlBillData.getBillId()+",'"+
-	     		 		itemData.getTenantId()+"','"+ itemData.getItemType()+"','"+
-	     		 		itemData.getFeeItemId()+"',"+itemData.getTotalFee()+","+createTime+")";
-	        	System.out.println("itemSql="+itemSql);
-	        	st.executeUpdate(itemSql);
+	        	totalFee = client.hget(SmcCacheConstant.Cache.BILL_ITEM_DATA_PREFIX+bsn, policyId+":"+itemData.getFeeItemId());
+	        	//System.out.println("totalFee---"+totalFee);
+				insertBillItemData(itemData, billId, period, createTime,
+						statement, totalFee);
 	        }
 			conn.commit();
 			isSucc = true;
@@ -581,6 +547,55 @@ public class CalculateProxy {
 		}
 		return isSucc;
 	}
+	
+	private int insertBillItemData(StlBillItemData itemData, String billId,
+			String period, String createTime, Statement statement,
+			String totalFee) throws SQLException {
+		String billItemId = ObjectUtils.toString(SeqUtil.getNewId(SmcConstants.STL_BILL_ITEM_DATA$BILL_ITEM_ID$SEQ),SmcSeqUtil.getRandom());
+		StringBuilder strSql = new StringBuilder("insert into ");
+		strSql.append(SmcConstants.STL_BILL_ITEM_DATA_TABLE_PREFIX).append(period);
+		strSql.append(" (bill_item_id,bill_id,tenant_id,item_type,fee_item_id,total_fee,create_time)");
+		strSql.append(" values(");
+		strSql.append(billItemId).append(",");
+		strSql.append(billId).append(",'");
+		strSql.append(itemData.getTenantId()).append("','");
+		strSql.append(itemData.getItemType()).append("','");
+		strSql.append(itemData.getFeeItemId()).append("',");
+		strSql.append(totalFee).append(",");
+		strSql.append(createTime).append(")");
+		System.out.println("itemSql="+strSql);
+		return statement.executeUpdate(strSql.toString());
+	}
+	
+	private int insertBillData(StlBillData stlBillData, String period,
+			String createTime, Statement statement, String origFee) throws SQLException {
+		
+		StringBuilder strSql = new StringBuilder("insert into ");
+		strSql.append(SmcConstants.STL_BILL_DATA_TABLE_PREFIX).append(period);
+		strSql.append(" (bill_id,bill_from,batch_no,tenant_id,policy_code,stl_object_id,");
+		strSql.append("stl_element_id,stl_element_sn,bill_style_sn,bill_time_sn,");
+		strSql.append("bill_start_time,bill_end_time,orig_fee,create_time)");
+		strSql.append(" values(");
+		strSql.append(stlBillData.getBillId()).append(",'");
+		strSql.append(stlBillData.getBillFrom()).append("','");
+		strSql.append(stlBillData.getBatchNo()).append("','");
+		strSql.append(stlBillData.getTenantId()).append("','");
+		strSql.append(stlBillData.getPolicyCode()).append("','");
+		strSql.append(stlBillData.getStlObjectId()).append("',");
+		strSql.append(stlBillData.getStlElementId()).append(",'");
+		strSql.append(stlBillData.getStlElementSn()).append("','");
+		strSql.append(stlBillData.getBillStyleSn()).append("',");
+		strSql.append(stlBillData.getBillTimeSn()).append(",'");
+		strSql.append(stlBillData.getBillStartTime()).append("','");
+		strSql.append(stlBillData.getBillEndTime()).append("',");
+		strSql.append(origFee).append(",");
+		strSql.append(createTime).append(")");
+		
+		System.out.println("sql="+strSql);
+        return statement.executeUpdate(strSql.toString());
+	}
+	
+	
 	
 	public void exportFileAndFtp(String batchNo){
 		ICacheClient billClient = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.BILL_CACHE);

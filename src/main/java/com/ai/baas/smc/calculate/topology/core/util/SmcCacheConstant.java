@@ -65,13 +65,20 @@ public final class SmcCacheConstant {
     
     
     public static class Cache{
-    	public static final String COUNTER="smc_cal_counter";
+    	public static final String COUNTER = "smc_stat_counter";
     	
-    	public static final String finishKey
-    	 = "busidata_tenantId_batchNo_billTimeSn_objectId_stats_times";
+    	public static final String finishKey = "smc_stat_times";
     	
-    	public static final String lockKey = "smc_stats_lock";
+    	public static final String lockKey = "smc_stat_lock";
+    	
+    	public static final String BILL_PREFIX = "smc_bill_";
+    	
+    	public static final String BILL_DATA_PREFIX = "smc_bill_data_";
+    	
+    	public static final String BILL_ITEM_DATA_PREFIX = "smc_bill_item_data_";
     }
+    
+    
 
     public static class Dshm {
         public static class TableName {

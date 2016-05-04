@@ -22,29 +22,60 @@ dependencies{
     compile 'mysql:mysql-connector-java:5.1.34'
     
     // 框架级依赖
-    compile 'org.apache.kafka:kafka_2.10:0.8.2.1'
-    compile 'org.apache.storm:storm-kafka:0.9.6'
     compile 'org.apache.hbase:hbase-client:1.1.2'
     compile 'com.ai.baas.storm:baas-storm:0.1.2-SNAPSHOT'
     compile 'commons-dbutils:commons-dbutils:1.5'
+    compile ('com.ai.opt.sdk:opt-sdk:1.0-SNAPSHOT'){
+    	exclude group: 'org.springframework', module: 'spring-context'
+    	exclude group: 'org.springframework', module: 'spring-context'
+    	exclude group: 'com.alibaba', module: 'dubbox'
+    	exclude group: 'org.postgresql', module: 'postgresql'
+    	exclude group: 'org.apache.commons', module: 'commons-email'
+    	exclude group: 'org.hibernate', module: 'hibernate-validator'
+    	exclude group: 'org.jboss.netty', module: 'netty'
+    }
+    compile 'com.ai.baas.smc:policymanage:0.1-SNAPSHOT'
+    compile 'com.ai.baas:baas-dshm-sdk:1.0.5-SNAPSHOT'
+    compile 'org.wltea.expression:IKExpression:2.1.2'
+    //compile 'com.ai.baas.smc:elementmanage:0.1-SNAPSHOT'
     
-    // 不打包依赖
-    provided 'org.apache.storm:storm-core:0.9.6'
-    
-      compile 'com.ai.opt.sdk:opt-sdk:1.0-SNAPSHOT'
-      compile 'com.ai.baas.smc:policymanage:0.1-SNAPSHOT'
-      compile 'com.ai.baas:baas-dshm-sdk:1.0.5-SNAPSHOT'
-      compile 'org.wltea.expression:IKExpression:2.1.2'
-      compile 'com.ai.baas.smc:elementmanage:0.1-SNAPSHOT'
-    
+    /*
     compile ('com.alibaba:dubbox:2.8.3'){
 		exclude group: 'org.springframework', module: 'spring'
 	}
+	*/
 	compile 'org.apache.poi:poi:3.13'
     compile 'org.apache.poi:poi-ooxml:3.13'
     compile 'org.apache.poi:poi-ooxml-schemas:3.13'
+    
+    // 不打包依赖
+    provided 'org.apache.storm:storm-core:0.9.6'
+    provided 'org.apache.logging.log4j:log4j:2.4'
+    provided 'org.apache.logging.log4j:log4j-slf4j-impl:2.4'
+    provided 'org.slf4j:slf4j-api:1.7.12'
+    provided 'org.slf4j:slf4j-log4j12:1.7.5'
+    provided 'org.apache.logging.log4j:log4j-api:2.4'
+    provided 'org.apache.logging.log4j:log4j-jcl:2.3'
+    provided 'org.apache.logging.log4j:log4j-core:2.3'
 	
 }
+
+
+jar {
+    dependsOn configurations.runtime
+    from {
+        (configurations.runtime - configurations.provided).collect {
+            it.isDirectory() ? it : zipTree(it)
+        }
+    }
+    {
+    	exclude "META-INF/*.SF"
+        exclude "META-INF/*.DSA"
+        exclude "META-INF/*.RSA"
+    }
+          
+}
+
 
 sourceSets {
     main {

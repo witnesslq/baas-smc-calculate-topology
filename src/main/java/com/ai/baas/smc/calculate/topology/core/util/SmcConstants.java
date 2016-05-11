@@ -14,4 +14,6 @@ public class SmcConstants {
 	public static final String CCS_APPNAME = "ccs.appname";
 	public static final String CCS_ZK_ADDRESS = "ccs.zk_address";
 	
+	public static final String CHARSET_GBK = "GBK";
+	
 }

@@ -1,6 +1,9 @@
 package com.ai.baas.smc.calculate.topology.core.proxy;
 
+import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.sql.Connection;
@@ -11,13 +14,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.TreeMap;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
+import org.apache.commons.io.Charsets;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.ObjectUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.time.DateFormatUtils;
-import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
@@ -25,7 +31,6 @@ import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.filter.CompareFilter;
-import org.apache.hadoop.hbase.filter.FilterList;
 import org.apache.hadoop.hbase.filter.RowFilter;
 import org.apache.hadoop.hbase.filter.SubstringComparator;
 import org.apache.hadoop.hbase.util.Bytes;
@@ -37,12 +42,11 @@ import org.apache.poi.xssf.usermodel.XSSFCellStyle;
 import org.apache.poi.xssf.usermodel.XSSFRow;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.wltea.expression.ExpressionEvaluator;
 import org.wltea.expression.datameta.Variable;
 
-import com.ai.baas.dshm.client.CacheFactoryUtil;
-import com.ai.baas.dshm.client.impl.DshmClient;
-import com.ai.baas.dshm.client.interfaces.IDshmClient;
 import com.ai.baas.smc.api.policymanage.param.StepCalValue;
 import com.ai.baas.smc.calculate.topology.core.bo.StlBillData;
 import com.ai.baas.smc.calculate.topology.core.bo.StlBillItemData;
@@ -51,11 +55,14 @@ import com.ai.baas.smc.calculate.topology.core.bo.StlPolicy;
 import com.ai.baas.smc.calculate.topology.core.bo.StlPolicyItem;
 import com.ai.baas.smc.calculate.topology.core.bo.StlPolicyItemCondition;
 import com.ai.baas.smc.calculate.topology.core.bo.StlPolicyItemPlan;
+import com.ai.baas.smc.calculate.topology.core.bo.StlSysParam;
 import com.ai.baas.smc.calculate.topology.core.bo.SwitchCalValue;
-import com.ai.baas.smc.calculate.topology.core.util.CacheBLMapper;
 import com.ai.baas.smc.calculate.topology.core.util.DateUtil;
 import com.ai.baas.smc.calculate.topology.core.util.IKin;
+import com.ai.baas.smc.calculate.topology.core.util.SftpUtil;
 import com.ai.baas.smc.calculate.topology.core.util.SmcCacheConstant;
+import com.ai.baas.smc.calculate.topology.core.util.SmcCacheConstant.ParamCode;
+import com.ai.baas.smc.calculate.topology.core.util.SmcCacheConstant.TypeCode;
 import com.ai.baas.smc.calculate.topology.core.util.SmcConstants;
 import com.ai.baas.smc.calculate.topology.core.util.SmcSeqUtil;
 import com.ai.baas.storm.jdbc.JdbcProxy;
@@ -65,9 +72,10 @@ import com.ai.baas.storm.util.BaseConstants;
 import com.ai.baas.storm.util.HBaseProxy;
 import com.ai.opt.sdk.cache.factory.CacheClientFactory;
 import com.ai.paas.ipaas.mcs.interfaces.ICacheClient;
-
 import com.alibaba.fastjson.JSON;
 import com.google.common.base.Joiner;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -79,12 +87,11 @@ import com.mysql.jdbc.Statement;
  *
  */
 public class CalculateProxy {
-	
+	private static final Logger log = LoggerFactory.getLogger(CalculateProxy.class);
 	private String detail_bill_prefix = "stl_bill_detail_data_";
 	private String detail_bill_cf = "col_def";
 	private String exportLocal = "~/export";
 	private String exportRemotePath = "";
-	
 
 	public CalculateProxy(Map<String,String> stormConf){
 		String localpath = stormConf.get("smc.calculate.export.local.temp");
@@ -110,7 +117,6 @@ public class CalculateProxy {
 	 * @param objectId
 	 * @param tenantId
 	 * @return
-	 * @throws ParseException
 	 */
 	public List<StlPolicy> getPolicyList(String objectId, String tenantId) throws Exception {
 		// TODO Auto-generated method stub
@@ -156,7 +162,6 @@ public class CalculateProxy {
 	 * @param policyId
 	 * @param tenantId
 	 * @return
-	 * @throws ParseException
 	 */
 	public List<StlPolicyItemCondition> getPolicyItemList(Long itemId, String tenantId) throws Exception {
 		// TODO Auto-generated method stub
@@ -382,14 +387,13 @@ public class CalculateProxy {
 		return value;
 	}
 
-	
-
-	public synchronized String dealBill(String policyCode, double value, String tenantId, String batchNo, String objectId,
+	public String dealBill(String policyCode, double value, String tenantId, String batchNo, String objectId,
 			long elementId, String billStyle, String billTime,String feeItemId,String policyId,String elementSn,String bsn) throws Exception{
 		ICacheClient billClient = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.BILL_CACHE);
 		//一级key=SMC_BILL_账期     二级key=租户+批次号+账期+政策+科目..................
 		//String billAll = billClient.get(getCacheBillKey(policyId));
-		String billAll = billClient.hget(getCacheBillTable(bsn), policyId);
+		String billKey = assembleCacheKey(SmcCacheConstant.Cache.BILL_PREFIX,bsn);
+		String billAll = billClient.hget(billKey, policyId);
 		StlBillData stlBillData = null;
 		if (StringUtils.isBlank(billAll)) {
 			stlBillData = new StlBillData();
@@ -408,26 +412,30 @@ public class CalculateProxy {
 			stlBillData.setBillStartTime(DateUtil.getFirstDay(billTime, "yyyyMM"));
 			stlBillData.setBillEndTime(DateUtil.getLastDay(billTime, "yyyyMM"));
 			stlBillData.setBillTimeSn(billTime);
-			stlBillData.setItemDatas(new ArrayList<StlBillItemData>());
+			//stlBillData.setItemDatas(new ArrayList<StlBillItemData>());
+			
+			billClient.hset(billKey, policyId, JSON.toJSONString(stlBillData));
 		}else{
 			stlBillData = JSON.parseObject(billAll, StlBillData.class);
-//			double fee = stlBillData.getOrigFee().doubleValue() + value;
-//			stlBillData.setOrigFee(fee);
 		}
-		billClient.hincrByFloat(SmcCacheConstant.Cache.BILL_DATA_PREFIX+bsn, policyId, value);
-		List<StlBillItemData> itemDatas = stlBillData.getItemDatas();
-		if (!contains(itemDatas, feeItemId, value)) {
-			StlBillItemData stlBillItemData = new StlBillItemData();
+		billClient.hincrByFloat(assembleCacheKey(SmcCacheConstant.Cache.BILL_DATA_PREFIX,bsn), policyId, value);
+		
+		String billItemKey = assembleCacheKey(SmcCacheConstant.Cache.BILL_ITEM_PREFIX,bsn);
+		String policyIdAndFeeItemKey = assembleCacheKey(policyId,":",feeItemId);
+		String billItemData = billClient.hget(billItemKey, policyIdAndFeeItemKey);
+		StlBillItemData stlBillItemData = null;
+		if(StringUtils.isBlank(billItemData)){
+			stlBillItemData = new StlBillItemData();
 			stlBillItemData.setBillId(stlBillData.getBillId());
 			stlBillItemData.setTenantId(stlBillData.getTenantId());
 			stlBillItemData.setItemType("1");
 			stlBillItemData.setFeeItemId(feeItemId);
 			stlBillItemData.setTotalFee(new Double(0));
-			itemDatas.add(stlBillItemData);
+			
+			billClient.hset(billItemKey, policyIdAndFeeItemKey, JSON.toJSONString(stlBillItemData));
 		}
-		billClient.hincrByFloat(SmcCacheConstant.Cache.BILL_ITEM_DATA_PREFIX+bsn, policyId+":"+feeItemId, value);
-		//billClient.set(getCacheBillTable(policyId), JSON.toJSONString(stlBillData));
-		billClient.hset(getCacheBillTable(bsn), policyId, JSON.toJSONString(stlBillData));
+		billClient.hincrByFloat(assembleCacheKey(SmcCacheConstant.Cache.BILL_ITEM_DATA_PREFIX,bsn), policyIdAndFeeItemKey, value);
+		
 		return stlBillData.getBillId().toString();
 	}
 
@@ -453,11 +461,14 @@ public class CalculateProxy {
 //		return flag;
 //	}
 	
-	private String getCacheBillTable(String batchNo){
-		StringBuilder billKey = new StringBuilder();
-		billKey.append(SmcCacheConstant.Cache.BILL_PREFIX).append(batchNo);
-		return billKey.toString();	
+	private String assembleCacheKey(String... params){
+		StringBuilder key = new StringBuilder();
+		for (String param : params) {
+			key.append(param);
+		}
+		return key.toString();	
 	}
+
 	
 	public void outputDetailBill(String period,String row, Map<String,String> data){
 		try {
@@ -469,6 +480,7 @@ public class CalculateProxy {
 				put.addColumn(cf, Bytes.toBytes(entry.getKey()), Bytes.toBytes(entry.getValue()));
 			}
 			table.put(put);
+			table.close();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -493,19 +505,23 @@ public class CalculateProxy {
 	public void insertBillData(String period,String bsn) throws Exception
 	{
 		ICacheClient billClient = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.BILL_CACHE);
-		Map<String,String> billMaps = billClient.hgetAll(SmcCacheConstant.Cache.BILL_PREFIX+bsn);
+		Map<String,String> billMaps = billClient.hgetAll(assembleCacheKey(SmcCacheConstant.Cache.BILL_PREFIX,bsn));
 		int opt_times = 0;
 		StlBillData stlBillData = null;
 		//for(String bill:billMaps.values()){
 		for (Entry<String, String> entry : billMaps.entrySet()) {
 			stlBillData = JSON.parseObject(entry.getValue(), StlBillData.class);
-			if(insert(stlBillData,period,entry.getKey(),bsn,billClient)){
-				opt_times++;
-			}
+//			if(insert(stlBillData,period,entry.getKey(),bsn,billClient)){
+//				opt_times++;
+//			}
+			opt_times = 1;
 		}
 		if(billMaps.size() == opt_times){
 			//导出文件
+			exportFileAndFtp(bsn);
+			
 			billClient.del(SmcCacheConstant.Cache.BILL_PREFIX+bsn);
+			billClient.del(SmcCacheConstant.Cache.BILL_ITEM_PREFIX+bsn);
 			billClient.del(SmcCacheConstant.Cache.BILL_DATA_PREFIX+bsn);
 			billClient.del(SmcCacheConstant.Cache.BILL_ITEM_DATA_PREFIX+bsn);
 			billClient.hdel(SmcCacheConstant.Cache.lockKey, bsn);
@@ -521,14 +537,15 @@ public class CalculateProxy {
 			conn.setAutoCommit(false);
 			String createTime = DateFormatUtils.format(new Date(), "yyyyMMddHHmmss");
 			Statement statement = (Statement)conn.createStatement();
-			String origFee = client.hget(SmcCacheConstant.Cache.BILL_DATA_PREFIX+bsn, policyId);
+			String origFee = client.hget(assembleCacheKey(SmcCacheConstant.Cache.BILL_DATA_PREFIX,bsn), policyId);
 			//System.out.println("origFee=="+origFee);
 			insertBillData(stlBillData, period, createTime, statement, origFee);
-	        List<StlBillItemData> itemDatas = stlBillData.getItemDatas();
+	        //List<StlBillItemData> itemDatas = stlBillData.getItemDatas();
+			List<StlBillItemData> itemDatas = getItemDataByPolicyId(policyId,bsn,client);
 	        String billId = stlBillData.getBillId().toString();
 	        String totalFee = "0";
 	        for(StlBillItemData itemData:itemDatas){
-	        	totalFee = client.hget(SmcCacheConstant.Cache.BILL_ITEM_DATA_PREFIX+bsn, policyId+":"+itemData.getFeeItemId());
+	        	totalFee = client.hget(assembleCacheKey(SmcCacheConstant.Cache.BILL_ITEM_DATA_PREFIX,bsn), assembleCacheKey(policyId,":",itemData.getFeeItemId()));
 	        	//System.out.println("totalFee---"+totalFee);
 				insertBillItemData(itemData, billId, period, createTime,
 						statement, totalFee);
@@ -546,6 +563,21 @@ public class CalculateProxy {
 			}
 		}
 		return isSucc;
+	}
+	
+	private List<StlBillItemData> getItemDataByPolicyId(String policyId,String bsn,ICacheClient client){
+		List<StlBillItemData> itemDatas = new ArrayList<StlBillItemData>();
+		Map<String,String> itemDataMap = client.hgetAll(assembleCacheKey(SmcCacheConstant.Cache.BILL_ITEM_PREFIX,bsn));
+		String[] splits = null;
+		StlBillItemData stlBillItemData = null;
+		for(Entry<String,String> entry:itemDataMap.entrySet()){
+			splits = StringUtils.splitPreserveAllTokens(entry.getKey(),":");
+			if(policyId.equals(splits[0])){
+				stlBillItemData = JSON.parseObject(entry.getValue(),StlBillItemData.class);
+				itemDatas.add(stlBillItemData);
+			}
+		}
+		return itemDatas;
 	}
 	
 	private int insertBillItemData(StlBillItemData itemData, String billId,
@@ -597,66 +629,193 @@ public class CalculateProxy {
 	
 	
 	
-	public void exportFileAndFtp(String batchNo){
+	public void exportFileAndFtp(String bsn){
 		ICacheClient billClient = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.BILL_CACHE);
-		Map<String,String> billAll= billClient.hgetAll("smc_bill_"+batchNo);
+		Map<String,String> billAll= billClient.hgetAll(SmcCacheConstant.Cache.BILL_PREFIX+bsn);
 		StlBillData stlBillData = null;
 		//for(String bill:billAll.values()){
-		String policyId = "",billJson = "";
-		String exportPath = "";
+		String policyId = "",exportPath = "";
+		String tenantId = "";
 		for(Entry<String,String> entry:billAll.entrySet()){
 			policyId = entry.getKey();
 			stlBillData = JSON.parseObject(entry.getValue(), StlBillData.class);
+			tenantId = stlBillData.getTenantId();
 			try {
-				exportPath = exportExcel(stlBillData,policyId,batchNo);
-				exportCsv(stlBillData,policyId);
+				exportPath = exportExcel(stlBillData,policyId,bsn,billClient);
+				exportCsv(stlBillData,policyId,exportPath);
 				//不用政策Id导出，用账单ID作为导出id
-				
-				
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
-			
+		}
+		String zipFilePath = createZipFile(bsn);
+		System.out.println("压缩文件生成本地路径--->>>"+zipFilePath);
+		if (uploadFile(tenantId, zipFilePath, billClient)) {
+			System.out.println("正在清理打包文件...");
+			String rmPath = StringUtils.substringBeforeLast(zipFilePath, ".zip");
+			FileUtils.deleteQuietly(FileUtils.getFile(rmPath));
+			FileUtils.getFile(zipFilePath).delete();
 		}
 		
 	}
 	
-	public String exportCsv(StlBillData stlBillData,String policyId){
+	private boolean uploadFile(String tenantId,String zipFilePath,ICacheClient billClient){
+		boolean isSucc = false;
+		try {
+			Map<String,String> sftpCfg = getSftpConfig(tenantId,billClient);
+			if(!verifySftpConfigParam(sftpCfg)){
+				throw new Exception("读取上传SFTP参数失败:"+sftpCfg.toString());
+			}
+			System.out.println("sftp config="+sftpCfg.toString());
+			SftpUtil sftpUtil = new SftpUtil(sftpCfg.get("user"),
+					sftpCfg.get("pwd"), sftpCfg.get("host"), "");
+			sftpUtil.connect();
+			sftpUtil.uploadFile(zipFilePath, sftpCfg.get("remote"));
+			sftpUtil.disconnect();
+			log.debug("上传数据完成!");
+			isSucc = true;
+		} catch (Exception e) {
+			e.printStackTrace();
+			log.error("上传文件失败,原因["+e.getMessage()+"]");
+		}
+		return isSucc;
+	}
+	
+	private boolean verifySftpConfigParam(Map<String,String> sftpCfg){
+		if (StringUtils.isNotBlank(sftpCfg.get("host"))
+				&& StringUtils.isNotBlank(sftpCfg.get("remote"))
+				&& StringUtils.isNotBlank(sftpCfg.get("user"))
+				&& StringUtils.isNotBlank(sftpCfg.get("pwd"))) {
+			return true;
+		}else{
+			return false;
+		}
+	}
+	
+	
+	private Map<String,String> getSftpConfig(String tenantId, ICacheClient client) {
+		Map<String,String> config = Maps.newHashMap();
+		StlSysParam stlSysParam = getSysParamCache(tenantId,ParamCode.UPLOAD_URL_DIFF_FILE,client);
+		String url = stlSysParam != null? stlSysParam.getColumnValue():"";
+		String[] split = url.split(":");
+		config.put("host", split[0]);
+		config.put("remote", split[1]);
+		stlSysParam = getSysParamCache(tenantId,ParamCode.USER_NAME,client);
+		String user = stlSysParam != null? stlSysParam.getColumnValue():"";
+		config.put("user", user);
+		stlSysParam = getSysParamCache(tenantId,ParamCode.PWD,client);
+		String pwd = stlSysParam != null? stlSysParam.getColumnValue():"";
+		config.put("pwd", pwd);
+		return config;
+	}
+	
+	private StlSysParam getSysParamCache(String tenantId, String paramCode,ICacheClient client){
+		String sysParamKey = Joiner.on(".").join(tenantId, TypeCode.SFTP_CONF, paramCode);
+		String data = client.get(sysParamKey);
+		if(StringUtils.isBlank(data)){
+			return null;
+		}
+		return JSON.parseArray(data, StlSysParam.class).get(0);
+	}
+	
+	
+	
+	private String createZipFile(String bsn){
+		String zipFilePath = Joiner.on(File.separator).join(exportLocal, bsn);
+		String zipFileName = zipFilePath.concat(".zip");
+		FileOutputStream outputStream;
+		ZipOutputStream out = null;
+		try {
+			outputStream = new FileOutputStream(zipFileName);
+			out = new ZipOutputStream(new BufferedOutputStream(outputStream));
+	        createCompressedFile(out, FileUtils.getFile(zipFilePath), "");
+		} catch (Exception e) {
+			e.printStackTrace();
+		} finally{
+			IOUtils.closeQuietly(out);
+		}
+        return zipFileName;
+	}
+	
+	
+	public String exportCsv(StlBillData stlBillData,String policyId,String exportPath){
 		String period = stlBillData.getBillTimeSn();
 		TableName tableName = TableName.valueOf(detail_bill_prefix+period);
+		Table table = null;
+		ResultScanner scanner = null;
 		try {
-			Table table = HBaseProxy.getConnection().getTable(tableName);
-			FilterList filterList = new FilterList();
-			filterList.addFilter(new RowFilter(CompareFilter.CompareOp.EQUAL,new SubstringComparator(stlBillData.getTenantId())));
-			filterList.addFilter(new RowFilter(CompareFilter.CompareOp.EQUAL,new SubstringComparator(policyId)));
-			filterList.addFilter(new RowFilter(CompareFilter.CompareOp.EQUAL,new SubstringComparator(period)));
+			String filePath = createCsvFile(stlBillData,exportPath);
+			String rowKeyPrefix = Joiner.on(BaseConstants.COMMON_JOINER).join(
+					stlBillData.getTenantId(),
+					stlBillData.getBillId().toString(), period);
+			table = HBaseProxy.getConnection().getTable(tableName);
 			Scan scan = new Scan();
-			scan.setFilter(filterList);
-			ResultScanner scanner = table.getScanner(scan);
-			for (Result res : scanner) {
-				//res.
-				
-				
-//				Cell[] cells = res.rawCells();
-//				for(Cell cell:cells){
-//					System.out.println(Bytes.toString(cell.getQualifier())+"="+Bytes.toString(cell.getValue()));
-//				}
-				
-			}
-			scanner.close();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
+			scan.setCaching(300);
+			scan.setFilter(new RowFilter(CompareFilter.CompareOp.EQUAL,new SubstringComparator(rowKeyPrefix)));
+			scanner = table.getScanner(scan);
+			outputCsvFile(filePath, scanner);
+		} catch (Exception e) {
 			e.printStackTrace();
+		} finally{
+			if(scanner != null){
+				scanner.close();
+			}
+			if(table != null){
+				try {
+					table.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
 		}
-		
-		
-		
 		return "";
 	}
 	
 	
 	
-	public String exportExcel(StlBillData stlBillData,String policyId,String batchNo) throws Exception{
+	private void outputCsvFile(String filePath, ResultScanner scanner){
+		int count = 0;
+		List<String> columnNames = Lists.newArrayList();
+		List<String> columnValues;
+		BufferedOutputStream buffer = null;
+		try{
+			buffer = new BufferedOutputStream(new FileOutputStream(filePath,true));
+			for (Result res : scanner) {
+				count++;
+				columnValues = Lists.newArrayList();
+				for (KeyValue kv : res.raw()) {
+					//System.out.println(Bytes.toString(kv.getQualifier())+"="+Bytes.toString(kv.getValue()));
+					if (count == 1) {
+						columnNames.add(Bytes.toString(kv.getQualifier()));
+					}
+					columnValues.add(Bytes.toString(kv.getValue()));
+				}
+				if(count == 1){
+					System.out.println(Joiner.on(",").join(columnNames));
+					IOUtils.write(Joiner.on(",").join(columnNames).concat(IOUtils.LINE_SEPARATOR), buffer, Charsets.UTF_8);
+				}
+				IOUtils.write(Joiner.on(",").join(columnValues).concat(IOUtils.LINE_SEPARATOR), buffer, SmcConstants.CHARSET_GBK);
+				buffer.flush();
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			IOUtils.closeQuietly(buffer);
+		}
+	}
+	
+	private String createCsvFile(StlBillData stlBillData,String exportPath) throws IOException{
+		String fileName = Joiner
+				.on(BaseConstants.COMMON_JOINER)
+				.join(stlBillData.getTenantId(), stlBillData.getPolicyCode(),
+						stlBillData.getBillTimeSn()).concat(".csv");
+        
+		String filePath = Joiner.on(File.separator).join(exportPath, fileName);
+        //FileUtils.forceMkdir(FileUtils.getFile(exportPath));
+        return filePath;
+	}
+	
+	public String exportExcel(StlBillData stlBillData,String policyId,String bsn,ICacheClient billClient) throws Exception{
 		Workbook wb = new XSSFWorkbook();
         XSSFCellStyle cellStyle = (XSSFCellStyle) wb.createCellStyle();
         cellStyle.setFillPattern(HSSFCellStyle.SOLID_FOREGROUND);
@@ -669,7 +828,7 @@ public class CalculateProxy {
         cell.setCellValue("结算方");
         cell.setCellStyle(cellStyle);
         cell = row0.createCell(1);
-        cell.setCellValue(stlBillData.getBillFrom());
+        cell.setCellValue(stlBillData.getStlElementSn());
         cell = row0.createCell(2);
         cell.setCellValue("批次号");
         cell.setCellStyle(cellStyle);
@@ -705,7 +864,9 @@ public class CalculateProxy {
         cell.setCellValue("结算金额(元)");
         cell.setCellStyle(cellStyle);
         cell = row3.createCell(1);
-        cell.setCellValue(stlBillData.getOrigFee().toString());
+        
+        String origFee = billClient.hget(assembleCacheKey(SmcCacheConstant.Cache.BILL_DATA_PREFIX,bsn), policyId);
+        cell.setCellValue(origFee);
         
         XSSFRow row5 = sheet0.createRow(5);// 第六行
         cell = row5.createCell(0);
@@ -719,7 +880,9 @@ public class CalculateProxy {
         cell.setCellStyle(cellStyle);
         
         int lineNo = 6;
-        List<StlBillItemData> itemDatas = stlBillData.getItemDatas();
+        //List<StlBillItemData> itemDatas = stlBillData.getItemDatas();
+        List<StlBillItemData> itemDatas = getItemDataByPolicyId(policyId,bsn,billClient);
+        String totalFee = "0";
 		for (StlBillItemData itemData : itemDatas) {
         	XSSFRow rowTmp = sheet0.createRow(lineNo);
             cell = rowTmp.createCell(0);
@@ -727,7 +890,8 @@ public class CalculateProxy {
             cell = rowTmp.createCell(1);
             cell.setCellValue("科目名称");
             cell = rowTmp.createCell(2);
-            cell.setCellValue(itemData.getTotalFee().toString());
+            totalFee = billClient.hget(assembleCacheKey(SmcCacheConstant.Cache.BILL_ITEM_DATA_PREFIX,bsn), assembleCacheKey(policyId,":",itemData.getFeeItemId()));
+            cell.setCellValue(totalFee);
         	lineNo++;
         }
 
@@ -736,7 +900,7 @@ public class CalculateProxy {
 				.join(stlBillData.getTenantId(), stlBillData.getPolicyCode(),
 						stlBillData.getBillTimeSn()).concat(".xlsx");
         
-		String local = Joiner.on(File.separator).join(exportLocal, batchNo, policyId);
+		String local = Joiner.on(File.separator).join(exportLocal, bsn, policyId);
         
         FileUtils.forceMkdir(FileUtils.getFile(local.toString()));
         
@@ -745,6 +909,41 @@ public class CalculateProxy {
 		
 		return local.toString();
 	}
+	
+	private void createCompressedFile(ZipOutputStream out, File file, String dir) {
+        try {
+            // 如果当前的是文件夹，则进行进一步处理
+            if (file.isDirectory()) {
+                // 得到文件列表信息
+                File[] files = file.listFiles();
+                // 将文件夹添加到下一级打包目录
+                out.putNextEntry(new ZipEntry(dir + File.separator));
+                dir = dir.length() == 0 ? "" : dir + File.separator;
+                // 循环将文件夹中的文件打包
+                for (int i = 0; i < files.length; i++) {
+                    createCompressedFile(out, files[i], dir + files[i].getName()); // 递归处理
+                }
+            } else { // 当前的是文件，打包处理
+                // 文件输入流
+                FileInputStream fis = new FileInputStream(file);
+                out.putNextEntry(new ZipEntry(dir));
+                // 进行写操作
+                int j = 0;
+                byte[] buffer = new byte[1024];
+                while ((j = fis.read(buffer)) > 0) {
+                    out.write(buffer, 0, j);
+                }
+                // 关闭输入流
+                fis.close();
+            }
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+
+        }
+    }
 	
 
 }

@@ -68,6 +68,8 @@ public class CostCalculatingBolt extends BaseBasicBolt {
 		String batchNo = "";
 		String source = "";
 		String bsn = "";
+		String rowKey_print = "";
+		String billId_print = "";
 		try {
 			String inputData = input.getStringByField("line");
 			//System.out.println("input===" + inputData);
@@ -77,8 +79,8 @@ public class CostCalculatingBolt extends BaseBasicBolt {
 			//System.out.println("data===" + data.toString());
 			batchNo = StringUtils.defaultString(data.get("batch_no"));
 			bsn = data.get(BaseConstants.BATCH_SERIAL_NUMBER);
-			//period = StringUtils.substring(data.get(BaseConstants.ACCOUNT_PERIOD), 0, 6);
-			period = "201604";
+			period = StringUtils.substring(data.get(BaseConstants.ACCOUNT_PERIOD), 0, 6);
+			//period = "201604";
 			source = "sys";
 			tenantId = data.get(BaseConstants.TENANT_ID);
 			acctId = data.get(BaseConstants.ACCT_ID);
@@ -110,21 +112,22 @@ public class CostCalculatingBolt extends BaseBasicBolt {
 							String order_id = data.get("order_id");
 							String[] family = new String[]{"data"};
 							//long billDataId = calculateProxy.getBillDataId(stlPolicy.getPolicyCode());
-
+							
 							// 行键
 							//租户ID_账单ID_账期ID_数据对象_账单来源_流水ID
 							String row = Joiner.on(BaseConstants.COMMON_JOINER)
 									.join(tenantId, billDataId, period,
 											objectId, source, order_id);
 							
-							System.out.println("row===" + row+",bill_id="+billDataId);
+							rowKey_print = row;
+							billId_print = billDataId;
+							//System.out.println("row===" + row+",bill_id="+billDataId);
 							data.put("bill_id", billDataId);
 							data.put("object_id",objectId);
 							data.put("bill_from","sys");
 							
 							data.put("stl_order_data_key", Joiner.on(BaseConstants.COMMON_JOINER).join(tenantId,batchNo,objectId,order_id));
 							calculateProxy.outputDetailBill(period, row, data);
-							
 							//System.out.println("bill_id="+billDataId);
 						}
 					}
@@ -140,6 +143,7 @@ public class CostCalculatingBolt extends BaseBasicBolt {
 			if(original.equals(counter)){
 				calculateProxy.insertBillData(period, bsn);
 				System.out.println("需要插入账单表喽。。。");
+				System.out.println("row==="+rowKey_print+",bill_id="+billId_print);
 			}
 			
 //			ICacheClient cacheStatsTimes = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.STATS_TIMES);

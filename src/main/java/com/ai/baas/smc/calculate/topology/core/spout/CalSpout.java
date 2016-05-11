@@ -69,15 +69,18 @@ public class CalSpout extends BaseRichSpout{
 			return;
 		}
 		List<FinishListVo> voList = JSON.parseArray(finishlist,FinishListVo.class);
-		System.out.println("-----------"+voList.size());
+		System.out.println("[收到统计数]--->>"+voList.size());
 		cacheStatsTimes.del(SmcCacheConstant.Cache.finishKey);
 		for (FinishListVo vo : voList) {
+			int count = 0;
 			String tenantId = vo.getTenantId();
 			String batchNo = vo.getBatchNo();
 			String billTimeSn = vo.getBillTimeSn();
-			System.out.println("---------------------"+vo.getBillTimeSn());
 			//String billTimeSn = "201605";
 			String objectId = vo.getObjectId();
+			System.out.println("[账期]--->>"+billTimeSn);
+			System.out.println("[批次号]--->>"+batchNo);
+			System.out.println("[objectId]--->>"+objectId);
 			cacheStatsTimes.hset(SmcCacheConstant.Cache.lockKey, batchNo, vo.getStats_times());
 			try {
 				Table table = HBaseProxy.getConnection().getTable(TableName.valueOf("RTM_OUTPUT_DETAIL_" + billTimeSn));
@@ -95,12 +98,14 @@ public class CalSpout extends BaseRichSpout{
 							collector.emit(new Values(line,objectId));
 						}
 					}
+					count++;
 				}
 				rs.close();
 				table.close();
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
+			System.out.println("从副本库[RTM_OUTPUT_DETAIL_" + billTimeSn+"]中取出"+count+"条数据!");
 		}
 	}
 

@@ -30,13 +30,31 @@ public final class SmcCacheConstant {
     public static final class TypeCode {
         private TypeCode() {
         }
+        public static final String STL_POLICY_ITEM_PLAN = "STL_POLICY_ITEM_PLAN";
 
+        public static final String SFTP_CONF = "SFTP_CONF";
+
+        public static final String AUTH = "AUTH";
+
+        public static final String DATA_COLLECT = "data_collect";
     }
 
     public static final class ParamCode {
         private ParamCode() {
         }
+        public static final String FEE_ITEM = "FEE_ITEM";
 
+        public static final String USER_NAME = "USER_NAME";
+
+        public static final String PWD = "PWD";
+
+        public static final String USER_ID = "USER_ID";
+
+        public static final String PAASWD = "PASSWD";
+
+        public static final String URL = "url";
+
+        public static final String UPLOAD_URL_DIFF_FILE = "upload_url_diff_file";
     }
 
     public static final class NameSpace {
@@ -67,11 +85,13 @@ public final class SmcCacheConstant {
     public static class Cache{
     	public static final String COUNTER = "smc_stat_counter";
     	
-    	public static final String finishKey = "smc_stat_times";
+    	public static final String finishKey = "smc_stat_times_test";
     	
     	public static final String lockKey = "smc_stat_lock";
     	
     	public static final String BILL_PREFIX = "smc_bill_";
+    	
+    	public static final String BILL_ITEM_PREFIX = "smc_bill_item_";
     	
     	public static final String BILL_DATA_PREFIX = "smc_bill_data_";
     	

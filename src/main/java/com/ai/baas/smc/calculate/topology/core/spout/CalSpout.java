@@ -58,13 +58,8 @@ public class CalSpout extends BaseRichSpout{
 
 	@Override
 	public void nextTuple() {
-		//logger.debug("spout开始..........");
-		//System.out.println("spout开始..........");
 		ICacheClient cacheStatsTimes = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.STATS_TIMES);
 		String finishlist = cacheStatsTimes.get(SmcCacheConstant.Cache.finishKey);
-		//System.out.println("-->"+finishlist);
-		//logger.debug("读取缓存结束..........");
-		//System.out.println("读取缓存结束..........");
 		if(StringUtils.isBlank(finishlist)){
 			return;
 		}
@@ -111,7 +106,6 @@ public class CalSpout extends BaseRichSpout{
 
 	@Override
 	public void declareOutputFields(OutputFieldsDeclarer declarer) {
-		// TODO Auto-generated method stub
 		 declarer.declare(new Fields("line","objectId"));
 	}
 

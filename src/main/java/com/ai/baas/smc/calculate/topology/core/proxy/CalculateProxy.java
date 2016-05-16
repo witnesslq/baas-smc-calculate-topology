@@ -92,11 +92,16 @@ public class CalculateProxy {
 	private String detail_bill_cf = "col_def";
 	private String exportLocal = "~/export";
 	private String exportRemotePath = "";
+	private int export_max = 50000;
 
 	public CalculateProxy(Map<String,String> stormConf){
 		String localpath = stormConf.get("smc.calculate.export.local.temp");
 		if(StringUtils.isNotBlank(localpath)){
 			this.exportLocal = localpath;
+		}
+		String lineMax = stormConf.get("smc.calculate.export.csv.line.max");
+		if (StringUtils.isNotBlank(lineMax)) {
+			export_max = Integer.parseInt(lineMax);
 		}
 		initSeq(stormConf.get(BaseConstants.JDBC_DEFAULT));
 	}
@@ -511,10 +516,10 @@ public class CalculateProxy {
 		//for(String bill:billMaps.values()){
 		for (Entry<String, String> entry : billMaps.entrySet()) {
 			stlBillData = JSON.parseObject(entry.getValue(), StlBillData.class);
-//			if(insert(stlBillData,period,entry.getKey(),bsn,billClient)){
-//				opt_times++;
-//			}
-			opt_times = 1;
+			if(insert(stlBillData,period,entry.getKey(),bsn,billClient)){
+				opt_times++;
+			}
+			//opt_times = 1;
 		}
 		if(billMaps.size() == opt_times){
 			//导出文件
@@ -636,10 +641,12 @@ public class CalculateProxy {
 		//for(String bill:billAll.values()){
 		String policyId = "",exportPath = "";
 		String tenantId = "";
+		String batchNo = "";
 		for(Entry<String,String> entry:billAll.entrySet()){
 			policyId = entry.getKey();
 			stlBillData = JSON.parseObject(entry.getValue(), StlBillData.class);
 			tenantId = stlBillData.getTenantId();
+			batchNo = stlBillData.getBatchNo();
 			try {
 				exportPath = exportExcel(stlBillData,policyId,bsn,billClient);
 				exportCsv(stlBillData,policyId,exportPath);
@@ -648,7 +655,7 @@ public class CalculateProxy {
 				e.printStackTrace();
 			}
 		}
-		String zipFilePath = createZipFile(bsn);
+		String zipFilePath = createZipFile(batchNo);
 		System.out.println("压缩文件生成本地路径--->>>"+zipFilePath);
 		if (uploadFile(tenantId, zipFilePath, billClient)) {
 			System.out.println("正在清理打包文件...");
@@ -695,28 +702,39 @@ public class CalculateProxy {
 	
 	private Map<String,String> getSftpConfig(String tenantId, ICacheClient client) {
 		Map<String,String> config = Maps.newHashMap();
-		StlSysParam stlSysParam = getSysParamCache(tenantId,ParamCode.UPLOAD_URL_DIFF_FILE,client);
+	
+		StlSysParam stlSysParam = getSysParamCache(new String[]{tenantId,TypeCode.SFTP_CONF,ParamCode.UPLOAD_URL_DIFF_FILE},client);
 		String url = stlSysParam != null? stlSysParam.getColumnValue():"";
 		String[] split = url.split(":");
 		config.put("host", split[0]);
 		config.put("remote", split[1]);
-		stlSysParam = getSysParamCache(tenantId,ParamCode.USER_NAME,client);
+		stlSysParam = getSysParamCache(new String[]{tenantId,TypeCode.SFTP_CONF,ParamCode.USER_NAME},client);
 		String user = stlSysParam != null? stlSysParam.getColumnValue():"";
 		config.put("user", user);
-		stlSysParam = getSysParamCache(tenantId,ParamCode.PWD,client);
+		stlSysParam = getSysParamCache(new String[]{tenantId,TypeCode.SFTP_CONF,ParamCode.PWD},client);
 		String pwd = stlSysParam != null? stlSysParam.getColumnValue():"";
 		config.put("pwd", pwd);
 		return config;
 	}
 	
-	private StlSysParam getSysParamCache(String tenantId, String paramCode,ICacheClient client){
-		String sysParamKey = Joiner.on(".").join(tenantId, TypeCode.SFTP_CONF, paramCode);
+	private StlSysParam getSysParamCache(String[] params,ICacheClient client){
+		String sysParamKey = Joiner.on(".").join(params);
 		String data = client.get(sysParamKey);
 		if(StringUtils.isBlank(data)){
 			return null;
 		}
 		return JSON.parseArray(data, StlSysParam.class).get(0);
 	}
+	
+//	private StlSysParam getSysParamCache(String tenantId,String typeCode,String paramCode,String columnValue,ICacheClient client){
+//		String sysParamKey = Joiner.on(".").join(tenantId, typeCode, paramCode, columnValue);
+//		String data = client.get(sysParamKey);
+//		if(StringUtils.isBlank(data)){
+//			return null;
+//		}
+//		return JSON.parseArray(data, StlSysParam.class).get(0);
+//	}
+	
 	
 	
 	
@@ -744,7 +762,7 @@ public class CalculateProxy {
 		Table table = null;
 		ResultScanner scanner = null;
 		try {
-			String filePath = createCsvFile(stlBillData,exportPath);
+			//String filePath = createCsvFile(stlBillData,exportPath);
 			String rowKeyPrefix = Joiner.on(BaseConstants.COMMON_JOINER).join(
 					stlBillData.getTenantId(),
 					stlBillData.getBillId().toString(), period);
@@ -753,7 +771,7 @@ public class CalculateProxy {
 			scan.setCaching(300);
 			scan.setFilter(new RowFilter(CompareFilter.CompareOp.EQUAL,new SubstringComparator(rowKeyPrefix)));
 			scanner = table.getScanner(scan);
-			outputCsvFile(filePath, scanner);
+			outputCsvFile(stlBillData, exportPath, scanner);
 		} catch (Exception e) {
 			e.printStackTrace();
 		} finally{
@@ -773,15 +791,19 @@ public class CalculateProxy {
 	
 	
 	
-	private void outputCsvFile(String filePath, ResultScanner scanner){
-		int count = 0;
+	private void outputCsvFile(StlBillData stlBillData, String exportPath, ResultScanner scanner){
+		int count = 1;
+		int fileCount = 1;
 		List<String> columnNames = Lists.newArrayList();
 		List<String> columnValues;
 		BufferedOutputStream buffer = null;
 		try{
-			buffer = new BufferedOutputStream(new FileOutputStream(filePath,true));
+			//buffer = new BufferedOutputStream(new FileOutputStream(filePath,true));
 			for (Result res : scanner) {
-				count++;
+				if (count == 1) {
+					buffer = createCsvFileStream(stlBillData,exportPath,fileCount);
+					fileCount++;
+				}
 				columnValues = Lists.newArrayList();
 				for (KeyValue kv : res.raw()) {
 					//System.out.println(Bytes.toString(kv.getQualifier())+"="+Bytes.toString(kv.getValue()));
@@ -796,6 +818,12 @@ public class CalculateProxy {
 				}
 				IOUtils.write(Joiner.on(",").join(columnValues).concat(IOUtils.LINE_SEPARATOR), buffer, SmcConstants.CHARSET_GBK);
 				buffer.flush();
+				count++;
+				if(count > export_max){
+					count = 1;
+					columnNames = Lists.newArrayList();
+					IOUtils.closeQuietly(buffer);
+				}
 			}
 		}catch(Exception e){
 			e.printStackTrace();
@@ -804,16 +832,26 @@ public class CalculateProxy {
 		}
 	}
 	
-	private String createCsvFile(StlBillData stlBillData,String exportPath) throws IOException{
+	
+	private BufferedOutputStream createCsvFileStream(StlBillData stlBillData,String exportPath,int fileCount) throws FileNotFoundException{
 		String fileName = Joiner
 				.on(BaseConstants.COMMON_JOINER)
-				.join(stlBillData.getTenantId(), stlBillData.getPolicyCode(),
-						stlBillData.getBillTimeSn()).concat(".csv");
-        
+				.join(stlBillData.getTenantId(), stlBillData.getStlElementSn(), stlBillData.getPolicyCode(),
+						stlBillData.getBillTimeSn(), "详单",fileCount).concat(".csv");
 		String filePath = Joiner.on(File.separator).join(exportPath, fileName);
-        //FileUtils.forceMkdir(FileUtils.getFile(exportPath));
-        return filePath;
+		return new BufferedOutputStream(new FileOutputStream(filePath,true));
 	}
+	
+//	private String createCsvFile(StlBillData stlBillData,String exportPath) throws IOException{
+//		String fileName = Joiner
+//				.on(BaseConstants.COMMON_JOINER)
+//				.join(stlBillData.getTenantId(), stlBillData.getPolicyCode(),
+//						stlBillData.getBillTimeSn()).concat(".csv");
+//        
+//		String filePath = Joiner.on(File.separator).join(exportPath, fileName);
+//        //FileUtils.forceMkdir(FileUtils.getFile(exportPath));
+//        return filePath;
+//	}
 	
 	public String exportExcel(StlBillData stlBillData,String policyId,String bsn,ICacheClient billClient) throws Exception{
 		Workbook wb = new XSSFWorkbook();
@@ -852,12 +890,12 @@ public class CalculateProxy {
         cell.setCellValue("开始时间");
         cell.setCellStyle(cellStyle);
         cell = row2.createCell(1);
-        cell.setCellValue(stlBillData.getBillStartTime().toString());
+        cell.setCellValue(DateFormatUtils.format(stlBillData.getBillStartTime().getTime(), "yyyy-MM-dd"));
         cell = row2.createCell(2);
         cell.setCellValue("结束时间");
         cell.setCellStyle(cellStyle);
         cell = row2.createCell(3);
-        cell.setCellValue(stlBillData.getBillEndTime().toString());
+        cell.setCellValue(DateFormatUtils.format(stlBillData.getBillEndTime().getTime(), "yyyy-MM-dd"));
         
         XSSFRow row3 = sheet0.createRow(3);// 第四行
         cell = row3.createCell(0);
@@ -883,12 +921,17 @@ public class CalculateProxy {
         //List<StlBillItemData> itemDatas = stlBillData.getItemDatas();
         List<StlBillItemData> itemDatas = getItemDataByPolicyId(policyId,bsn,billClient);
         String totalFee = "0";
+        String feeItemId = "";
 		for (StlBillItemData itemData : itemDatas) {
         	XSSFRow rowTmp = sheet0.createRow(lineNo);
             cell = rowTmp.createCell(0);
-            cell.setCellValue(itemData.getFeeItemId());
+            feeItemId = itemData.getFeeItemId();
+            cell.setCellValue(feeItemId);
             cell = rowTmp.createCell(1);
-            cell.setCellValue("科目名称");
+            //cell.setCellValue("科目名称");
+            StlSysParam stlSysParam = getSysParamCache(new String[]{stlBillData.getTenantId(),TypeCode.STL_POLICY_ITEM_PLAN,ParamCode.FEE_ITEM,feeItemId},billClient);
+    		String columnDesc = stlSysParam != null? stlSysParam.getColumnDesc():"";
+    		cell.setCellValue(columnDesc);
             cell = rowTmp.createCell(2);
             totalFee = billClient.hget(assembleCacheKey(SmcCacheConstant.Cache.BILL_ITEM_DATA_PREFIX,bsn), assembleCacheKey(policyId,":",itemData.getFeeItemId()));
             cell.setCellValue(totalFee);
@@ -897,10 +940,10 @@ public class CalculateProxy {
 
 		String fileName = Joiner
 				.on(BaseConstants.COMMON_JOINER)
-				.join(stlBillData.getTenantId(), stlBillData.getPolicyCode(),
-						stlBillData.getBillTimeSn()).concat(".xlsx");
+				.join(stlBillData.getTenantId(), stlBillData.getStlElementSn(),stlBillData.getPolicyCode(),
+						stlBillData.getBillTimeSn(), stlBillData.getBillId()).concat(".xlsx");
         
-		String local = Joiner.on(File.separator).join(exportLocal, bsn, policyId);
+		String local = Joiner.on(File.separator).join(exportLocal, stlBillData.getBatchNo(), policyId);
         
         FileUtils.forceMkdir(FileUtils.getFile(local.toString()));
         

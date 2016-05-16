@@ -85,7 +85,7 @@ public final class SmcCacheConstant {
     public static class Cache{
     	public static final String COUNTER = "smc_stat_counter";
     	
-    	public static final String finishKey = "smc_stat_times_test";
+    	public static final String finishKey = "smc_stat_times";
     	
     	public static final String lockKey = "smc_stat_lock";
     	

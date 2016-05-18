@@ -145,19 +145,6 @@ public class CostCalculatingBolt extends BaseBasicBolt {
 				System.out.println("需要插入账单表喽。。。");
 				System.out.println("row==="+rowKey_print+",bill_id="+billId_print);
 			}
-			
-//			ICacheClient cacheStatsTimes = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.STATS_TIMES);
-//			String finishlist = cacheStatsTimes.get(SmcCacheConstant.Cache.finishKey);
-//			List<FinishListVo> voList = JSON.parseArray(finishlist, FinishListVo.class);
-//			for (FinishListVo vo : voList) {
-//				if (vo.getBatchNo().equals(bsn)) {
-//					if (vo.getStats_times().equals(counter)) {
-//						calculateProxy.insertBillData("stl_bill_data_" + period, "stl_bill_item_data_" + period,bsn);
-//						//calculateProxy.exportFileAndFtp(batchNo);
-//						System.out.println("需要插入账单表喽。。。");
-//					}
-//				}
-//			}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

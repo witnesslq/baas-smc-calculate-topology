@@ -66,6 +66,7 @@ import com.ai.baas.smc.calculate.topology.core.util.SmcCacheConstant.TypeCode;
 import com.ai.baas.smc.calculate.topology.core.util.SmcConstants;
 import com.ai.baas.smc.calculate.topology.core.util.SmcSeqUtil;
 import com.ai.baas.storm.jdbc.JdbcProxy;
+import com.ai.baas.storm.jdbc.JdbcTemplate;
 import com.ai.baas.storm.sequence.datasource.SeqDataSourceLoader;
 import com.ai.baas.storm.sequence.util.SeqUtil;
 import com.ai.baas.storm.util.BaseConstants;
@@ -658,12 +659,43 @@ public class CalculateProxy {
 		String zipFilePath = createZipFile(batchNo);
 		System.out.println("压缩文件生成本地路径--->>>"+zipFilePath);
 		if (uploadFile(tenantId, zipFilePath, billClient)) {
+			updateImportLog(zipFilePath,tenantId,batchNo,billClient);
+			
 			System.out.println("正在清理打包文件...");
 			String rmPath = StringUtils.substringBeforeLast(zipFilePath, ".zip");
 			FileUtils.deleteQuietly(FileUtils.getFile(rmPath));
 			FileUtils.getFile(zipFilePath).delete();
 		}
 		
+	}
+	
+	private boolean updateImportLog(String zipFile,String tenantId,String batchNo,ICacheClient client){
+		String fileName = FileUtils.getFile(zipFile).getName();
+		StlSysParam stlSysParam = getSysParamCache(new String[]{tenantId,TypeCode.SFTP_CONF,ParamCode.UPLOAD_URL_DIFF_FILE},client);
+		String url = stlSysParam != null? stlSysParam.getColumnValue():"";
+		StringBuilder strSql = new StringBuilder("update stl_import_log s ");
+		strSql.append("set s.RST_FILE_NAME = ?,s.RST_FILE_URL = ?,");
+		strSql.append("s.STATE = '4',s.STATE_DESC='数据处理完成',");
+		strSql.append("s.STATE_CHG_TIME = ? ");
+		strSql.append("where s.BATCH_NO = ? and s.TENANT_ID=?");
+		
+		Object[] params = new Object[5];
+		params[0] = fileName;
+		params[1] = url;
+		params[2] = DateFormatUtils.format(new Date(), "yyyyMMddHHmmss");
+		params[3] = batchNo;
+		params[4] = tenantId;
+		Connection conn = null;
+		boolean isSucc = false;
+		try{
+			conn = JdbcProxy.getConnection(BaseConstants.JDBC_DEFAULT);
+			conn.setAutoCommit(false);
+			JdbcTemplate.update(strSql.toString(), conn, params);
+			isSucc = true;
+		}catch(Exception e){
+			log.error(e.getMessage());
+		}
+		return isSucc;
 	}
 	
 	private boolean uploadFile(String tenantId,String zipFilePath,ICacheClient billClient){

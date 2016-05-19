@@ -13,6 +13,10 @@ public class SmcConstants {
 	
 	public static final String CCS_APPNAME = "ccs.appname";
 	public static final String CCS_ZK_ADDRESS = "ccs.zk_address";
+	public static final String PAAS_AUTH_URL = "paas.auth.url";
+	public static final String PAAS_AUTH_PID = "paas.auth.pid";
+	public static final String PAAS_CCS_SERVICEID = "paas.ccs.serviceid";
+	public static final String PAAS_CCS_SERVICEPASSWORD = "paas.ccs.servicepassword";
 	
 	public static final String CHARSET_GBK = "GBK";
 	

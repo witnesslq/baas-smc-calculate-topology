@@ -71,7 +71,7 @@ import com.ai.baas.storm.sequence.datasource.SeqDataSourceLoader;
 import com.ai.baas.storm.sequence.util.SeqUtil;
 import com.ai.baas.storm.util.BaseConstants;
 import com.ai.baas.storm.util.HBaseProxy;
-import com.ai.opt.sdk.cache.factory.CacheClientFactory;
+import com.ai.opt.sdk.components.mcs.MCSClientFactory;
 import com.ai.paas.ipaas.mcs.interfaces.ICacheClient;
 import com.alibaba.fastjson.JSON;
 import com.google.common.base.Joiner;
@@ -126,7 +126,7 @@ public class CalculateProxy {
 	 */
 	public List<StlPolicy> getPolicyList(String objectId, String tenantId) throws Exception {
 		// TODO Auto-generated method stub
-		ICacheClient cacheClient = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.POLICY_CACHE);
+		ICacheClient cacheClient = MCSClientFactory.getCacheClient(SmcCacheConstant.NameSpace.POLICY_CACHE);
 		String policyAll = cacheClient.get(SmcCacheConstant.POLICY_ALL);
 		List<StlPolicy> stlPolicyList = new ArrayList<StlPolicy>();
 		List<StlPolicy> policyList = JSON.parseArray(policyAll, StlPolicy.class);
@@ -149,7 +149,7 @@ public class CalculateProxy {
 	 */
 	public List<StlPolicyItem> getStlPolicyItemLists(Long policyId, String tenantId)
 	{
-		ICacheClient cacheClient = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.POLICY_CACHE);
+		ICacheClient cacheClient = MCSClientFactory.getCacheClient(SmcCacheConstant.NameSpace.POLICY_CACHE);
 		String policyItemAll = cacheClient.get(SmcCacheConstant.POLICY_ITEM);
 		List<StlPolicyItem> stlPolicyItemList = new ArrayList<StlPolicyItem>();
 		List<StlPolicyItem> policyList = JSON.parseArray(policyItemAll, StlPolicyItem.class);
@@ -171,7 +171,7 @@ public class CalculateProxy {
 	 */
 	public List<StlPolicyItemCondition> getPolicyItemList(Long itemId, String tenantId) throws Exception {
 		// TODO Auto-generated method stub
-		ICacheClient cacheClient = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.POLICY_CACHE);
+		ICacheClient cacheClient = MCSClientFactory.getCacheClient(SmcCacheConstant.NameSpace.POLICY_CACHE);
 		String policyItemAll = cacheClient.get(SmcCacheConstant.POLICY_ITEM_CONDITION);
 		List<StlPolicyItemCondition> stlPolicyItemConditionList = new ArrayList<StlPolicyItemCondition>();
 		List<StlPolicyItemCondition> policyList = JSON.parseArray(policyItemAll, StlPolicyItemCondition.class);
@@ -185,7 +185,7 @@ public class CalculateProxy {
 	}
 
 	public List<StlPolicyItemPlan> getStlPolicyItemPlan(Long itemId, String tenantId) throws Exception {
-		ICacheClient cacheClient = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.POLICY_CACHE);
+		ICacheClient cacheClient = MCSClientFactory.getCacheClient(SmcCacheConstant.NameSpace.POLICY_CACHE);
 		String policyItemAll = cacheClient.get(SmcCacheConstant.POLICY_ITEM_PLAN);
 		List<StlPolicyItemPlan> stlPolicyItemPlanList = new ArrayList<StlPolicyItemPlan>();
 		List<StlPolicyItemPlan> policyList = JSON.parseArray(policyItemAll, StlPolicyItemPlan.class);
@@ -220,7 +220,7 @@ public class CalculateProxy {
 	 */
 	public boolean matchPolicy(Map<String,String> data, List<StlPolicyItemCondition> policyItemList) {
 		boolean flag = false;
-		ICacheClient elementcacheClient = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.ELEMENT_CACHE);
+		ICacheClient elementcacheClient = MCSClientFactory.getCacheClient(SmcCacheConstant.NameSpace.ELEMENT_CACHE);
 		for (StlPolicyItemCondition stlPolicyItemCondition : policyItemList) {
 			StringBuilder elementStr = new StringBuilder();
 			elementStr.append(stlPolicyItemCondition.getTenantId());
@@ -306,7 +306,7 @@ public class CalculateProxy {
 	 */
 	public double docaculate(StlPolicyItemPlan policyDetailQueryPlanInfo,Map<String,String> data) {
 		double value = 0;
-		ICacheClient elementcacheClient = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.ELEMENT_CACHE);
+		ICacheClient elementcacheClient = MCSClientFactory.getCacheClient(SmcCacheConstant.NameSpace.ELEMENT_CACHE);
 		String planType = policyDetailQueryPlanInfo.getPlanType();
 		String calType = policyDetailQueryPlanInfo.getCalType();// 算费方式
 		Long elementId = policyDetailQueryPlanInfo.getElementId();
@@ -395,7 +395,7 @@ public class CalculateProxy {
 
 	public String dealBill(String policyCode, double value, String tenantId, String batchNo, String objectId,
 			long elementId, String billStyle, String billTime,String feeItemId,String policyId,String elementSn,String bsn) throws Exception{
-		ICacheClient billClient = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.BILL_CACHE);
+		ICacheClient billClient = MCSClientFactory.getCacheClient(SmcCacheConstant.NameSpace.BILL_CACHE);
 		//一级key=SMC_BILL_账期     二级key=租户+批次号+账期+政策+科目..................
 		//String billAll = billClient.get(getCacheBillKey(policyId));
 		String billKey = assembleCacheKey(SmcCacheConstant.Cache.BILL_PREFIX,bsn);
@@ -495,7 +495,7 @@ public class CalculateProxy {
 
 	public long getBillDataId(String policyCode) {
 		long billDataId=0;
-		ICacheClient billClient = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.BILL_CACHE);
+		ICacheClient billClient = MCSClientFactory.getCacheClient(SmcCacheConstant.NameSpace.BILL_CACHE);
 		String billAll = billClient.get("bill");
 		List<StlBillData> dataList = JSON.parseArray(billAll, StlBillData.class);
 		for (StlBillData stlBillData : dataList) {
@@ -510,7 +510,7 @@ public class CalculateProxy {
 	
 	public void insertBillData(String period,String bsn) throws Exception
 	{
-		ICacheClient billClient = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.BILL_CACHE);
+		ICacheClient billClient = MCSClientFactory.getCacheClient(SmcCacheConstant.NameSpace.BILL_CACHE);
 		Map<String,String> billMaps = billClient.hgetAll(assembleCacheKey(SmcCacheConstant.Cache.BILL_PREFIX,bsn));
 		int opt_times = 0;
 		StlBillData stlBillData = null;
@@ -636,7 +636,7 @@ public class CalculateProxy {
 	
 	
 	public void exportFileAndFtp(String bsn){
-		ICacheClient billClient = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.BILL_CACHE);
+		ICacheClient billClient = MCSClientFactory.getCacheClient(SmcCacheConstant.NameSpace.BILL_CACHE);
 		Map<String,String> billAll= billClient.hgetAll(SmcCacheConstant.Cache.BILL_PREFIX+bsn);
 		StlBillData stlBillData = null;
 		//for(String bill:billAll.values()){

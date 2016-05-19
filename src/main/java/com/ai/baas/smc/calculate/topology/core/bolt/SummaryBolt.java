@@ -1,4 +1,4 @@
-package com.ai.baas.smc.calculate.topology.core.bolt;
+/*package com.ai.baas.smc.calculate.topology.core.bolt;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -117,3 +117,4 @@ public class SummaryBolt extends BaseBasicBolt {
 		
 	}
 }
+*/

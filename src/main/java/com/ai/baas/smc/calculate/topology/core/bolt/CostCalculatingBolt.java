@@ -26,8 +26,8 @@ import com.ai.baas.storm.message.MappingRule;
 import com.ai.baas.storm.message.MessageParser;
 import com.ai.baas.storm.util.BaseConstants;
 import com.ai.baas.storm.util.HBaseProxy;
-import com.ai.opt.sdk.cache.factory.CacheClientFactory;
-import com.ai.opt.sdk.helper.OptConfHelper;
+import com.ai.opt.sdk.components.base.ComponentConfigLoader;
+import com.ai.opt.sdk.components.mcs.MCSClientFactory;
 import com.ai.paas.ipaas.mcs.interfaces.ICacheClient;
 import com.google.common.base.Joiner;
 
@@ -52,9 +52,12 @@ public class CostCalculatingBolt extends BaseBasicBolt {
 	
 	private void loadCacheResource(Map<String,String> config){
 		Properties p=new Properties();
-		p.setProperty(SmcConstants.CCS_APPNAME, config.get(SmcConstants.CCS_APPNAME));
-		p.setProperty(SmcConstants.CCS_ZK_ADDRESS, config.get(SmcConstants.CCS_ZK_ADDRESS));
-		OptConfHelper.loadPaaSConf(p);
+		p.setProperty(SmcConstants.PAAS_AUTH_URL, config.get(SmcConstants.PAAS_AUTH_URL));
+		p.setProperty(SmcConstants.PAAS_AUTH_PID, config.get(SmcConstants.PAAS_AUTH_PID));
+		p.setProperty(SmcConstants.PAAS_CCS_SERVICEID, config.get(SmcConstants.PAAS_CCS_SERVICEID));
+		p.setProperty(SmcConstants.PAAS_CCS_SERVICEPASSWORD, config.get(SmcConstants.PAAS_CCS_SERVICEPASSWORD));
+		//OptConfHelper.loadPaaSConf(p);
+		ComponentConfigLoader.loadPaaSConf(p);
 	}
 	
 	@Override
@@ -137,7 +140,7 @@ public class CostCalculatingBolt extends BaseBasicBolt {
 			 * 更新计数器
 			 */
 			//calculateProxy.exportExcel(batchNo);
-			ICacheClient cacheClient = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.CAL_COMMON_CACHE);
+			ICacheClient cacheClient = MCSClientFactory.getCacheClient(SmcCacheConstant.NameSpace.CAL_COMMON_CACHE);
 			String counter = String.valueOf(cacheClient.hincrBy(SmcCacheConstant.Cache.COUNTER,bsn,1));
 			String original = StringUtils.defaultString(cacheClient.hget(SmcCacheConstant.Cache.lockKey,bsn));
 			if(original.equals(counter)){

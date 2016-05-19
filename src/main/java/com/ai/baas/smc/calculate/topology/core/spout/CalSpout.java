@@ -29,8 +29,8 @@ import com.ai.baas.smc.calculate.topology.core.bo.FinishListVo;
 import com.ai.baas.smc.calculate.topology.core.util.SmcCacheConstant;
 import com.ai.baas.smc.calculate.topology.core.util.SmcConstants;
 import com.ai.baas.storm.util.HBaseProxy;
-import com.ai.opt.sdk.cache.factory.CacheClientFactory;
-import com.ai.opt.sdk.helper.OptConfHelper;
+import com.ai.opt.sdk.components.base.ComponentConfigLoader;
+import com.ai.opt.sdk.components.mcs.MCSClientFactory;
 import com.ai.paas.ipaas.mcs.interfaces.ICacheClient;
 import com.alibaba.fastjson.JSON;
 
@@ -51,14 +51,17 @@ public class CalSpout extends BaseRichSpout{
 	
 	private void loadCacheResource(Map<String,String> config){
 		Properties p=new Properties();
-		p.setProperty(SmcConstants.CCS_APPNAME, config.get(SmcConstants.CCS_APPNAME));
-		p.setProperty(SmcConstants.CCS_ZK_ADDRESS, config.get(SmcConstants.CCS_ZK_ADDRESS));
-		OptConfHelper.loadPaaSConf(p);
+		p.setProperty(SmcConstants.PAAS_AUTH_URL, config.get(SmcConstants.PAAS_AUTH_URL));
+		p.setProperty(SmcConstants.PAAS_AUTH_PID, config.get(SmcConstants.PAAS_AUTH_PID));
+		p.setProperty(SmcConstants.PAAS_CCS_SERVICEID, config.get(SmcConstants.PAAS_CCS_SERVICEID));
+		p.setProperty(SmcConstants.PAAS_CCS_SERVICEPASSWORD, config.get(SmcConstants.PAAS_CCS_SERVICEPASSWORD));
+		//OptConfHelper.loadPaaSConf(p);
+		ComponentConfigLoader.loadPaaSConf(p);
 	}
 
 	@Override
 	public void nextTuple() {
-		ICacheClient cacheStatsTimes = CacheClientFactory.getCacheClient(SmcCacheConstant.NameSpace.STATS_TIMES);
+		ICacheClient cacheStatsTimes = MCSClientFactory.getCacheClient(SmcCacheConstant.NameSpace.STATS_TIMES);
 		String finishlist = cacheStatsTimes.get(SmcCacheConstant.Cache.finishKey);
 		if(StringUtils.isBlank(finishlist)){
 			return;

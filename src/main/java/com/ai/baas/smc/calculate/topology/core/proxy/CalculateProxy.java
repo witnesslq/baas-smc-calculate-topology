@@ -6,6 +6,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -829,6 +830,7 @@ public class CalculateProxy {
 		List<String> columnNames = Lists.newArrayList();
 		List<String> columnValues;
 		BufferedOutputStream buffer = null;
+		String qualifierName = "",colunmValue = "";
 		try{
 			//buffer = new BufferedOutputStream(new FileOutputStream(filePath,true));
 			for (Result res : scanner) {
@@ -839,10 +841,12 @@ public class CalculateProxy {
 				columnValues = Lists.newArrayList();
 				for (KeyValue kv : res.raw()) {
 					//System.out.println(Bytes.toString(kv.getQualifier())+"="+Bytes.toString(kv.getValue()));
+					qualifierName = Bytes.toString(kv.getQualifier());
 					if (count == 1) {
-						columnNames.add(Bytes.toString(kv.getQualifier()));
+						columnNames.add(qualifierName);
 					}
-					columnValues.add(Bytes.toString(kv.getValue()));
+					colunmValue = Bytes.toString(kv.getValue());
+					columnValues.add(!qualifierName.equalsIgnoreCase("item_fee")?colunmValue:formatUnit(colunmValue));
 				}
 				if(count == 1){
 					System.out.println(Joiner.on(",").join(columnNames));
@@ -936,7 +940,13 @@ public class CalculateProxy {
         cell = row3.createCell(1);
         
         String origFee = billClient.hget(assembleCacheKey(SmcCacheConstant.Cache.BILL_DATA_PREFIX,bsn), policyId);
-        cell.setCellValue(origFee);
+//		if (StringUtils.isNotBlank(origFee)) {
+//        	BigDecimal bOrigFee = new BigDecimal(Double.parseDouble(origFee));
+//            origFee = bOrigFee.divide(new BigDecimal(1000), 2, BigDecimal.ROUND_HALF_UP).toPlainString();
+//        }else{
+//        	origFee = "0";
+//        }
+        cell.setCellValue(formatUnit(origFee));
         
         XSSFRow row5 = sheet0.createRow(5);// 第六行
         cell = row5.createCell(0);
@@ -966,7 +976,7 @@ public class CalculateProxy {
     		cell.setCellValue(columnDesc);
             cell = rowTmp.createCell(2);
             totalFee = billClient.hget(assembleCacheKey(SmcCacheConstant.Cache.BILL_ITEM_DATA_PREFIX,bsn), assembleCacheKey(policyId,":",itemData.getFeeItemId()));
-            cell.setCellValue(totalFee);
+            cell.setCellValue(formatUnit(totalFee));
         	lineNo++;
         }
 
@@ -1019,6 +1029,15 @@ public class CalculateProxy {
 
         }
     }
+	
+	private String formatUnit(String fee){
+		String formatFee = "0";
+		if (StringUtils.isNotBlank(fee)) {
+        	BigDecimal bOrigFee = new BigDecimal(Double.parseDouble(fee));
+        	formatFee = bOrigFee.divide(new BigDecimal(1000), 2, BigDecimal.ROUND_HALF_UP).toPlainString();
+        }
+		return formatFee;
+	}
 	
 
 }

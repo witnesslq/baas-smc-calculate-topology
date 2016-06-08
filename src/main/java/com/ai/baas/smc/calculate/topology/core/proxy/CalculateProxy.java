@@ -124,7 +124,6 @@ public class CalculateProxy {
      * @return
      */
     public List<StlPolicy> getPolicyList(String objectId, String tenantId) throws Exception {
-        // TODO Auto-generated method stub
         ICacheClient cacheClient = MCSClientFactory
                 .getCacheClient(SmcCacheConstant.NameSpace.POLICY_CACHE);
         String policyAll = cacheClient.hget(SmcCacheConstant.NameSpace.POLICY_CACHE,
@@ -172,7 +171,6 @@ public class CalculateProxy {
      */
     public List<StlPolicyItemCondition> getPolicyItemList(Long itemId, String tenantId)
             throws Exception {
-        // TODO Auto-generated method stub
         ICacheClient cacheClient = MCSClientFactory
                 .getCacheClient(SmcCacheConstant.NameSpace.POLICY_CACHE);
         String policyItemAll = cacheClient.hget(SmcCacheConstant.NameSpace.POLICY_CACHE,

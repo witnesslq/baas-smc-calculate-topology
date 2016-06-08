@@ -830,7 +830,8 @@ public class CalculateProxy {
             scan.setFilter(new RowFilter(CompareFilter.CompareOp.EQUAL, new SubstringComparator(
                     rowKeyPrefix)));
             scanner = table.getScanner(scan);
-            outputCsvFile(stlBillData, exportPath, scanner);
+            // outputCsvFile(stlBillData, exportPath, scanner);
+            outputExcelFile(stlBillData, exportPath, scanner);
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
@@ -846,6 +847,69 @@ public class CalculateProxy {
             }
         }
         return "";
+    }
+
+    private void outputExcelFile(StlBillData stlBillData, String exportPath, ResultScanner scanner) {
+        int count = 0;
+        int fileCount = 1;
+        String qualifierName = "", colunmValue = "";
+        List<String> columnNames = new ArrayList<String>();
+        List<String> columnValues = new ArrayList<String>();
+        XSSFSheet sheet = null;
+        Workbook wb = new XSSFWorkbook();
+        for (Result res : scanner) {
+            for (KeyValue kv : res.raw()) {
+                qualifierName=Bytes.toString(kv.getQualifier());
+                if (count == 0) {
+                    columnNames.add(qualifierName);
+                }
+                colunmValue = Bytes.toString(kv.getValue());
+                columnValues.add(!qualifierName.equalsIgnoreCase("item_fee") ? colunmValue
+                        : formatUnit(colunmValue));
+            }
+            if (count == 0) {
+                sheet = (XSSFSheet) wb.createSheet("详单");
+            }
+            if (count == 0) {
+                for (int i = 0; i < columnNames.size(); i++) {
+                    XSSFRow row0 = sheet.createRow(count);// 第n行
+                    XSSFCell cell = row0.createCell(i);
+                    cell.setCellValue(columnNames.get(i));
+                }
+                count++;
+            } else {
+                for (int i = 0; i < columnNames.size(); i++) {
+                    XSSFRow row0 = sheet.createRow(count);// 第n行
+                    XSSFCell cell = row0.createCell(i);
+                    cell.setCellValue(columnNames.get(i));
+                }
+            }
+            if (count == export_max - 1) {
+                String fileName = Joiner
+                        .on(BaseConstants.COMMON_JOINER)
+                        .join(stlBillData.getTenantId(), stlBillData.getStlElementSn(),
+                                stlBillData.getPolicyCode(), stlBillData.getBillTimeSn(), "详单",
+                                fileCount).concat(".xlsx");
+                String filePath = Joiner.on(File.separator).join(exportPath, fileName);
+                try {
+                    FileOutputStream fileOut = new FileOutputStream(filePath + File.separator
+                            + fileName);
+                    wb.write(fileOut);
+                } catch (FileNotFoundException e) {
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
+                fileCount++;
+                count =0;
+            }
+        }
+        try {
+            wb.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private void outputCsvFile(StlBillData stlBillData, String exportPath, ResultScanner scanner) {

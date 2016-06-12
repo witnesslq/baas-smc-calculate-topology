@@ -64,6 +64,7 @@ import com.ai.baas.smc.calculate.topology.core.util.SftpUtil;
 import com.ai.baas.smc.calculate.topology.core.util.SmcCacheConstant;
 import com.ai.baas.smc.calculate.topology.core.util.SmcCacheConstant.ParamCode;
 import com.ai.baas.smc.calculate.topology.core.util.SmcCacheConstant.TypeCode;
+import com.ai.baas.smc.calculate.topology.core.util.SmcCacheFactory;
 import com.ai.baas.smc.calculate.topology.core.util.SmcConstants;
 import com.ai.baas.smc.calculate.topology.core.util.SmcSeqUtil;
 import com.ai.baas.storm.jdbc.JdbcProxy;
@@ -697,7 +698,7 @@ public class CalculateProxy {
             ICacheClient client) {
         String fileName = FileUtils.getFile(zipFile).getName();
         StlSysParam stlSysParam = getSysParamCache(new String[] { tenantId, TypeCode.SFTP_CONF,
-                ParamCode.UPLOAD_URL_DIFF_FILE }, client);
+                ParamCode.UPLOAD_URL_DIFF_FILE });
         String url = stlSysParam != null ? stlSysParam.getColumnValue() : "";
         StringBuilder strSql = new StringBuilder("update stl_import_log s ");
         strSql.append("set s.RST_FILE_NAME = ?,s.RST_FILE_URL = ?,");
@@ -727,7 +728,7 @@ public class CalculateProxy {
     private boolean uploadFile(String tenantId, String zipFilePath, ICacheClient billClient) {
         boolean isSucc = false;
         try {
-            Map<String, String> sftpCfg = getSftpConfig(tenantId, billClient);
+            Map<String, String> sftpCfg = getSftpConfig(tenantId);
             if (!verifySftpConfigParam(sftpCfg)) {
                 throw new Exception("读取上传SFTP参数失败:" + sftpCfg.toString());
             }
@@ -757,29 +758,28 @@ public class CalculateProxy {
         }
     }
 
-    private Map<String, String> getSftpConfig(String tenantId, ICacheClient client) {
+    private Map<String, String> getSftpConfig(String tenantId) {
         Map<String, String> config = Maps.newHashMap();
-
         StlSysParam stlSysParam = getSysParamCache(new String[] { tenantId, TypeCode.SFTP_CONF,
-                ParamCode.UPLOAD_URL_DIFF_FILE }, client);
+                ParamCode.UPLOAD_URL_DIFF_FILE });
         String url = stlSysParam != null ? stlSysParam.getColumnValue() : "";
         String[] split = url.split(":");
         config.put("host", split[0]);
         config.put("remote", split[1]);
         stlSysParam = getSysParamCache(new String[] { tenantId, TypeCode.SFTP_CONF,
-                ParamCode.USER_NAME }, client);
+                ParamCode.USER_NAME });
         String user = stlSysParam != null ? stlSysParam.getColumnValue() : "";
         config.put("user", user);
-        stlSysParam = getSysParamCache(
-                new String[] { tenantId, TypeCode.SFTP_CONF, ParamCode.PWD }, client);
+        stlSysParam = getSysParamCache(new String[] { tenantId, TypeCode.SFTP_CONF, ParamCode.PWD });
         String pwd = stlSysParam != null ? stlSysParam.getColumnValue() : "";
         config.put("pwd", pwd);
         return config;
     }
 
-    private StlSysParam getSysParamCache(String[] params, ICacheClient client) {
+    private StlSysParam getSysParamCache(String[] params) {
+        ICacheClient client = SmcCacheFactory.getSysParamCacheClient();
         String sysParamKey = Joiner.on(".").join(params);
-        String data = client.get(sysParamKey);
+        String data = client.hget(SmcCacheConstant.NameSpace.SYS_PARAM_CACHE, sysParamKey);
         if (StringUtils.isBlank(data)) {
             return null;
         }
@@ -857,7 +857,7 @@ public class CalculateProxy {
         Workbook wb = new XSSFWorkbook();
         for (Result res : scanner) {
             for (KeyValue kv : res.raw()) {
-                qualifierName=Bytes.toString(kv.getQualifier());
+                qualifierName = Bytes.toString(kv.getQualifier());
                 if (count == 0) {
                     columnNames.add(qualifierName);
                 }
@@ -900,7 +900,7 @@ public class CalculateProxy {
                 }
 
                 fileCount++;
-                count =0;
+                count = 0;
             }
         }
         try {
@@ -1067,7 +1067,7 @@ public class CalculateProxy {
             cell = rowTmp.createCell(1);
             // cell.setCellValue("科目名称");
             StlSysParam stlSysParam = getSysParamCache(new String[] { stlBillData.getTenantId(),
-                    TypeCode.STL_POLICY_ITEM_PLAN, ParamCode.FEE_ITEM, feeItemId }, billClient);
+                    TypeCode.STL_POLICY_ITEM_PLAN, ParamCode.FEE_ITEM, feeItemId });
             String columnDesc = stlSysParam != null ? stlSysParam.getColumnDesc() : "";
             cell.setCellValue(columnDesc);
             cell = rowTmp.createCell(2);

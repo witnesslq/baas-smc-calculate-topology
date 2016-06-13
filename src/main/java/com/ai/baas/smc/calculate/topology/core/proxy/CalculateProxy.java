@@ -15,6 +15,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.NavigableMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -94,6 +95,11 @@ public class CalculateProxy {
     private String exportLocal = "~/export";
 
     private int export_max = 50000;
+
+    /**
+     * 默认列族名
+     */
+    public static final String COLUMN_DEF = "col_def";
 
     public CalculateProxy(Map<String, String> stormConf) {
         String localpath = stormConf.get("smc.calculate.export.local.temp");
@@ -848,38 +854,44 @@ public class CalculateProxy {
         return "";
     }
 
-    private void outputExcelFile(StlBillData stlBillData, String exportPath, ResultScanner scanner,String original) {
+    private void outputExcelFile(StlBillData stlBillData, String exportPath, ResultScanner scanner,
+            String original) {
         int count = 0;
         int fileCount = 1;
-        int countAll=1;
-        int originalNum=Integer.parseInt(original);
+        int countAll = 0;
+        int originalNum = Integer.parseInt(original);
+        List<NavigableMap<byte[], byte[]>> resultList = getMap(scanner);
         String qualifierName = "", colunmValue = "";
         List<String> columnNames = new ArrayList<String>();
-       int num=getNum(scanner);
         XSSFSheet sheet = null;
-        Workbook wb=null;
+        Workbook wb = null;
         Boolean flag = false;
-        for (Result res : scanner) {
-                if((++countAll)==originalNum){
-                    flag = true;
+        int num = columnNames.size();
+        for (NavigableMap<byte[], byte[]> map : resultList) {
+            if ((++countAll) == num) {
+                flag = true;
+            }
+            List<String> columnValues = new ArrayList<String>();
+
+            for (Map.Entry<byte[], byte[]> entry : map.entrySet()) {
+                // System.out.println("key= " + entry.getKey() + " and value= " + entry.getValue());
+                // }
+                // for (KeyValue kv : res.raw()) {
+                qualifierName = entry.getKey().toString();
+                if (count == 0) {
+                    columnNames.add(qualifierName);
                 }
-                List<String> columnValues = new ArrayList<String>();
-                for (KeyValue kv : res.raw()) {
-                    qualifierName = Bytes.toString(kv.getQualifier());
-                    if (count == 0) {
-                        columnNames.add(qualifierName);
-                    }
-                    colunmValue = Bytes.toString(kv.getValue());
-                    columnValues.add(!qualifierName.equalsIgnoreCase("item_fee") ? colunmValue
-                            : formatUnit(colunmValue));
-                }
+                colunmValue = entry.getValue().toString();
+                columnValues.add(!qualifierName.equalsIgnoreCase("item_fee") ? colunmValue
+                        : formatUnit(colunmValue));
+            }
             if (count == 0) {
                 wb = new XSSFWorkbook();
                 sheet = (XSSFSheet) wb.createSheet("详单");
             }
             if (count == 0) {
                 XSSFRow row0 = sheet.createRow(count);// 第n行
-                XSSFRow row1 = sheet.createRow(count+1);// 第n行
+                XSSFRow row1 = sheet.createRow(count + 1);// 第n行
                 for (int i = 0; i < columnNames.size(); i++) {
                     XSSFCell cell = row0.createCell(i);
                     cell.setCellValue(columnNames.get(i));
@@ -889,14 +901,14 @@ public class CalculateProxy {
                     cell.setCellValue(columnValues.get(j));
                 }
             } else {
-                XSSFRow rown = sheet.createRow(count+1);// 第n行
+                XSSFRow rown = sheet.createRow(count + 1);// 第n行
                 for (int i = 0; i < columnValues.size(); i++) {
                     XSSFCell cell = rown.createCell(i);
                     cell.setCellValue(columnValues.get(i));
                 }
             }
             count++;
-                if ((count >= export_max) || (flag)) {
+            if ((count >= export_max) || flag) {
                 String fileName = Joiner
                         .on(BaseConstants.COMMON_JOINER)
                         .join(stlBillData.getTenantId(), stlBillData.getStlElementSn(),
@@ -912,25 +924,26 @@ public class CalculateProxy {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-
                 fileCount++;
                 count = 0;
             }
         }
-//        try {
-//            wb.close();  
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        }
+        try {
+            wb.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
-    private int getNum(ResultScanner scanner) {
-        int i=0;
-        
+    private List<NavigableMap<byte[], byte[]>> getMap(ResultScanner scanner) {
+
+        List<NavigableMap<byte[], byte[]>> result = new ArrayList<NavigableMap<byte[], byte[]>>();
         for (Result res : scanner) {
-            i++;
+
+            NavigableMap<byte[], byte[]> map = res.getFamilyMap(COLUMN_DEF.getBytes());
+            result.add(map);
         }
-        return i;
+        return result;
     }
 
     private void outputCsvFile(StlBillData stlBillData, String exportPath, ResultScanner scanner) {

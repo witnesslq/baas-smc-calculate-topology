@@ -866,7 +866,8 @@ public class CalculateProxy {
         XSSFSheet sheet = null;
         Workbook wb = null;
         Boolean flag = false;
-        int num = columnNames.size();
+        
+        int num = resultList.size();
         for (NavigableMap<byte[], byte[]> map : resultList) {
             if ((++countAll) == num) {
                 flag = true;

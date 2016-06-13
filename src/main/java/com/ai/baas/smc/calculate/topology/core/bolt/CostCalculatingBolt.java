@@ -140,7 +140,7 @@ public class CostCalculatingBolt extends BaseBasicBolt {
             String original = StringUtils.defaultString(cacheClient.hget(
                     SmcCacheConstant.Cache.lockKey, bsn));
             if (original.equals(counter)) {
-                calculateProxy.insertBillData(period, bsn);
+                calculateProxy.insertBillData(period, bsn, original);
                 System.out.println("需要插入账单表喽。。。");
                 System.out.println("row===" + rowKey_print + ",bill_id=" + billId_print);
             }

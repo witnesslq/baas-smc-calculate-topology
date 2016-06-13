@@ -2,7 +2,6 @@ package com.ai.baas.smc.calculate.topology.core.spout;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hbase.KeyValue;
@@ -26,10 +25,9 @@ import backtype.storm.tuple.Fields;
 import backtype.storm.tuple.Values;
 
 import com.ai.baas.smc.calculate.topology.core.bo.FinishListVo;
+import com.ai.baas.smc.calculate.topology.core.util.LoadConfUtil;
 import com.ai.baas.smc.calculate.topology.core.util.SmcCacheConstant;
-import com.ai.baas.smc.calculate.topology.core.util.SmcConstants;
 import com.ai.baas.storm.util.HBaseProxy;
-import com.ai.opt.sdk.components.base.ComponentConfigLoader;
 import com.ai.opt.sdk.components.mcs.MCSClientFactory;
 import com.ai.paas.ipaas.mcs.interfaces.ICacheClient;
 import com.alibaba.fastjson.JSON;
@@ -37,7 +35,7 @@ import com.alibaba.fastjson.JSON;
 public class CalSpout extends BaseRichSpout {
     private static final long serialVersionUID = 5296876971073823644L;
 
-    private static Logger logger = LoggerFactory.getLogger(CalSpout.class);
+    private static Logger LOG = LoggerFactory.getLogger(CalSpout.class);
 
     private SpoutOutputCollector collector;
 
@@ -47,26 +45,16 @@ public class CalSpout extends BaseRichSpout {
     @Override
     public void open(@SuppressWarnings("rawtypes")
     Map conf, TopologyContext context, SpoutOutputCollector collector) {
-        // System.out.println("open--------------");
+        LoadConfUtil.loadPaasConf(conf);
         HBaseProxy.loadResource(conf);
         HBaseProxy.getConnection();
-        loadCacheResource(conf);
-        this.collector = collector;
-    }
 
-    private void loadCacheResource(Map<String, String> config) {
-        Properties p = new Properties();
-        p.setProperty(SmcConstants.PAAS_AUTH_URL, config.get(SmcConstants.PAAS_AUTH_URL));
-        p.setProperty(SmcConstants.PAAS_AUTH_PID, config.get(SmcConstants.PAAS_AUTH_PID));
-        p.setProperty(SmcConstants.PAAS_CCS_SERVICEID, config.get(SmcConstants.PAAS_CCS_SERVICEID));
-        p.setProperty(SmcConstants.PAAS_CCS_SERVICEPASSWORD,
-                config.get(SmcConstants.PAAS_CCS_SERVICEPASSWORD));
-        // OptConfHelper.loadPaaSConf(p);
-        ComponentConfigLoader.loadPaaSConf(p);
+        this.collector = collector;
     }
 
     @Override
     public void nextTuple() {
+        LOG.info("开始查询是否有算费数据...");
         ICacheClient cacheStatsTimes = MCSClientFactory
                 .getCacheClient(SmcCacheConstant.NameSpace.STATS_TIMES);
         String finishlist = cacheStatsTimes.hget(SmcCacheConstant.NameSpace.STATS_TIMES,
@@ -80,10 +68,8 @@ public class CalSpout extends BaseRichSpout {
                 SmcCacheConstant.Cache.finishKey);
         for (FinishListVo vo : voList) {
             int count = 0;
-            String tenantId = vo.getTenantId();
             String batchNo = vo.getBatchNo();
             String billTimeSn = vo.getBillTimeSn();
-            // String billTimeSn = "201605";
             String objectId = vo.getObjectId();
             System.out.println("[账期]--->>" + billTimeSn);
             System.out.println("[批次号]--->>" + batchNo);

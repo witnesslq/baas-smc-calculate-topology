@@ -2,7 +2,6 @@ package com.ai.baas.smc.calculate.topology.core.bolt;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
@@ -19,14 +18,13 @@ import com.ai.baas.smc.calculate.topology.core.bo.StlPolicyItem;
 import com.ai.baas.smc.calculate.topology.core.bo.StlPolicyItemCondition;
 import com.ai.baas.smc.calculate.topology.core.bo.StlPolicyItemPlan;
 import com.ai.baas.smc.calculate.topology.core.proxy.CalculateProxy;
+import com.ai.baas.smc.calculate.topology.core.util.LoadConfUtil;
 import com.ai.baas.smc.calculate.topology.core.util.SmcCacheConstant;
-import com.ai.baas.smc.calculate.topology.core.util.SmcConstants;
 import com.ai.baas.storm.jdbc.JdbcProxy;
 import com.ai.baas.storm.message.MappingRule;
 import com.ai.baas.storm.message.MessageParser;
 import com.ai.baas.storm.util.BaseConstants;
 import com.ai.baas.storm.util.HBaseProxy;
-import com.ai.opt.sdk.components.base.ComponentConfigLoader;
 import com.ai.opt.sdk.components.mcs.MCSClientFactory;
 import com.ai.paas.ipaas.mcs.interfaces.ICacheClient;
 import com.google.common.base.Joiner;
@@ -42,28 +40,17 @@ public class CostCalculatingBolt extends BaseBasicBolt {
 
     private String[] outputFields;
 
+    @SuppressWarnings("unchecked")
     @Override
-    public void prepare(Map stormConf, TopologyContext context) {
-        // HbaseClient.loadResource(stormConf);
+    public void prepare(@SuppressWarnings("rawtypes")
+    Map stormConf, TopologyContext context) {
+        LoadConfUtil.loadPaasConf(stormConf);
         JdbcProxy.loadDefaultResource(stormConf);
         HBaseProxy.loadResource(stormConf);
         mappingRules[0] = MappingRule.getMappingRule(MappingRule.FORMAT_TYPE_INPUT,
                 BaseConstants.JDBC_DEFAULT);
         mappingRules[1] = mappingRules[0];
-        loadCacheResource(stormConf);
         calculateProxy = new CalculateProxy(stormConf);
-        // super.prepare(stormConf, context);
-    }
-
-    private void loadCacheResource(Map<String, String> config) {
-        Properties p = new Properties();
-        p.setProperty(SmcConstants.PAAS_AUTH_URL, config.get(SmcConstants.PAAS_AUTH_URL));
-        p.setProperty(SmcConstants.PAAS_AUTH_PID, config.get(SmcConstants.PAAS_AUTH_PID));
-        p.setProperty(SmcConstants.PAAS_CCS_SERVICEID, config.get(SmcConstants.PAAS_CCS_SERVICEID));
-        p.setProperty(SmcConstants.PAAS_CCS_SERVICEPASSWORD,
-                config.get(SmcConstants.PAAS_CCS_SERVICEPASSWORD));
-        // OptConfHelper.loadPaaSConf(p);
-        ComponentConfigLoader.loadPaaSConf(p);
     }
 
     @Override
@@ -72,7 +59,6 @@ public class CostCalculatingBolt extends BaseBasicBolt {
         double value = 0;
         String period = "";
         String tenantId = "";
-        String acctId = "";
         String objectId = "";
         String batchNo = "";
         String source = "";
@@ -82,7 +68,6 @@ public class CostCalculatingBolt extends BaseBasicBolt {
         try {
             String inputData = input.getStringByField("line");
             // System.out.println("input===" + inputData);
-            // LOG.info(" ====== 开始执行对账bolt，inputData = [" + inputData + "]");
             MessageParser messageParser = MessageParser.parseObject(inputData, mappingRules,
                     outputFields);
             data = messageParser.getData();
@@ -90,11 +75,8 @@ public class CostCalculatingBolt extends BaseBasicBolt {
             batchNo = StringUtils.defaultString(data.get("batch_no"));
             bsn = data.get(BaseConstants.BATCH_SERIAL_NUMBER);
             period = StringUtils.substring(data.get(BaseConstants.ACCOUNT_PERIOD), 0, 6);
-            // period = "201604";
             source = "sys";
             tenantId = data.get(BaseConstants.TENANT_ID);
-            acctId = data.get(BaseConstants.ACCT_ID);
-
             objectId = StringUtils.upperCase(input.getStringByField("objectId"));
             List<StlPolicy> policyList = calculateProxy.getPolicyList(objectId, tenantId);
             // 处理政策
@@ -169,7 +151,6 @@ public class CostCalculatingBolt extends BaseBasicBolt {
 
     @Override
     public void declareOutputFields(OutputFieldsDeclarer declarer) {
-        // TODO Auto-generated method stub
     }
 
 }

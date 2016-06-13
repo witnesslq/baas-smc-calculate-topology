@@ -866,7 +866,7 @@ public class CalculateProxy {
         XSSFSheet sheet = null;
         Workbook wb = null;
         Boolean flag = false;
-        
+
         int num = resultList.size();
         for (NavigableMap<byte[], byte[]> map : resultList) {
             if ((++countAll) == num) {
@@ -878,11 +878,11 @@ public class CalculateProxy {
                 // System.out.println("key= " + entry.getKey() + " and value= " + entry.getValue());
                 // }
                 // for (KeyValue kv : res.raw()) {
-                qualifierName = entry.getKey().toString();
+                qualifierName = new String(entry.getKey());
                 if (count == 0) {
                     columnNames.add(qualifierName);
                 }
-                colunmValue = entry.getValue().toString();
+                colunmValue = new String(entry.getValue());
                 columnValues.add(!qualifierName.equalsIgnoreCase("item_fee") ? colunmValue
                         : formatUnit(colunmValue));
             }

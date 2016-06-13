@@ -896,7 +896,7 @@ public class CalculateProxy {
                 }
             }
             count++;
-                if ((count == 2000) || (flag)) {
+                if ((count >= export_max) || (flag)) {
                 String fileName = Joiner
                         .on(BaseConstants.COMMON_JOINER)
                         .join(stlBillData.getTenantId(), stlBillData.getStlElementSn(),

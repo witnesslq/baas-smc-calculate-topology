@@ -527,7 +527,7 @@ public class CalculateProxy {
         return billDataId;
     }
 
-    public void insertBillData(String period, String bsn) throws Exception {
+    public void insertBillData(String period, String bsn, String original) throws Exception {
         ICacheClient billClient = MCSClientFactory
                 .getCacheClient(SmcCacheConstant.NameSpace.BILL_CACHE);
         Map<String, String> billMaps = billClient.hgetAll(assembleCacheKey(
@@ -544,7 +544,7 @@ public class CalculateProxy {
         }
         if (billMaps.size() == opt_times) {
             // 导出文件
-            exportFileAndFtp(bsn);
+            exportFileAndFtp(bsn, original);
 
             billClient.del(SmcCacheConstant.Cache.BILL_PREFIX + bsn);
             billClient.del(SmcCacheConstant.Cache.BILL_ITEM_PREFIX + bsn);
@@ -659,7 +659,7 @@ public class CalculateProxy {
         return statement.executeUpdate(strSql.toString());
     }
 
-    public void exportFileAndFtp(String bsn) {
+    public void exportFileAndFtp(String bsn, String original) {
         ICacheClient billClient = MCSClientFactory
                 .getCacheClient(SmcCacheConstant.NameSpace.BILL_CACHE);
         Map<String, String> billAll = billClient.hgetAll(SmcCacheConstant.Cache.BILL_PREFIX + bsn);
@@ -675,7 +675,7 @@ public class CalculateProxy {
             batchNo = stlBillData.getBatchNo();
             try {
                 exportPath = exportExcel(stlBillData, policyId, bsn, billClient);
-                exportCsv(stlBillData, policyId, exportPath);
+                exportCsv(stlBillData, policyId, exportPath, original);
                 // 不用政策Id导出，用账单ID作为导出id
             } catch (Exception e) {
                 e.printStackTrace();
@@ -813,7 +813,8 @@ public class CalculateProxy {
         return zipFileName;
     }
 
-    public String exportCsv(StlBillData stlBillData, String policyId, String exportPath) {
+    public String exportCsv(StlBillData stlBillData, String policyId, String exportPath,
+            String original) {
         String period = stlBillData.getBillTimeSn();
         TableName tableName = TableName.valueOf(detail_bill_prefix + period);
         Table table = null;
@@ -829,7 +830,7 @@ public class CalculateProxy {
                     rowKeyPrefix)));
             scanner = table.getScanner(scan);
             // outputCsvFile(stlBillData, exportPath, scanner);
-            outputExcelFile(stlBillData, exportPath, scanner);
+            outputExcelFile(stlBillData, exportPath, scanner, original);
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
@@ -847,42 +848,55 @@ public class CalculateProxy {
         return "";
     }
 
-    private void outputExcelFile(StlBillData stlBillData, String exportPath, ResultScanner scanner) {
+    private void outputExcelFile(StlBillData stlBillData, String exportPath, ResultScanner scanner,String original) {
         int count = 0;
         int fileCount = 1;
+        int countAll=1;
+        int originalNum=Integer.parseInt(original);
         String qualifierName = "", colunmValue = "";
         List<String> columnNames = new ArrayList<String>();
-        List<String> columnValues = new ArrayList<String>();
+       int num=getNum(scanner);
         XSSFSheet sheet = null;
-        Workbook wb = new XSSFWorkbook();
+        Workbook wb=null;
+        Boolean flag = false;
         for (Result res : scanner) {
-            for (KeyValue kv : res.raw()) {
-                qualifierName = Bytes.toString(kv.getQualifier());
-                if (count == 0) {
-                    columnNames.add(qualifierName);
+                if((++countAll)==originalNum){
+                    flag = true;
                 }
-                colunmValue = Bytes.toString(kv.getValue());
-                columnValues.add(!qualifierName.equalsIgnoreCase("item_fee") ? colunmValue
-                        : formatUnit(colunmValue));
-            }
+                List<String> columnValues = new ArrayList<String>();
+                for (KeyValue kv : res.raw()) {
+                    qualifierName = Bytes.toString(kv.getQualifier());
+                    if (count == 0) {
+                        columnNames.add(qualifierName);
+                    }
+                    colunmValue = Bytes.toString(kv.getValue());
+                    columnValues.add(!qualifierName.equalsIgnoreCase("item_fee") ? colunmValue
+                            : formatUnit(colunmValue));
+                }
             if (count == 0) {
+                wb = new XSSFWorkbook();
                 sheet = (XSSFSheet) wb.createSheet("详单");
             }
             if (count == 0) {
+                XSSFRow row0 = sheet.createRow(count);// 第n行
+                XSSFRow row1 = sheet.createRow(count+1);// 第n行
                 for (int i = 0; i < columnNames.size(); i++) {
-                    XSSFRow row0 = sheet.createRow(count);// 第n行
                     XSSFCell cell = row0.createCell(i);
                     cell.setCellValue(columnNames.get(i));
                 }
-                count++;
+                for (int j = 0; j < columnValues.size(); j++) {
+                    XSSFCell cell = row1.createCell(j);
+                    cell.setCellValue(columnValues.get(j));
+                }
             } else {
-                for (int i = 0; i < columnNames.size(); i++) {
-                    XSSFRow row0 = sheet.createRow(count);// 第n行
-                    XSSFCell cell = row0.createCell(i);
-                    cell.setCellValue(columnNames.get(i));
+                XSSFRow rown = sheet.createRow(count+1);// 第n行
+                for (int i = 0; i < columnValues.size(); i++) {
+                    XSSFCell cell = rown.createCell(i);
+                    cell.setCellValue(columnValues.get(i));
                 }
             }
-            if (count == export_max - 1) {
+            count++;
+                if ((count == 2000) || (flag)) {
                 String fileName = Joiner
                         .on(BaseConstants.COMMON_JOINER)
                         .join(stlBillData.getTenantId(), stlBillData.getStlElementSn(),
@@ -890,9 +904,9 @@ public class CalculateProxy {
                                 fileCount).concat(".xlsx");
                 String filePath = Joiner.on(File.separator).join(exportPath, fileName);
                 try {
-                    FileOutputStream fileOut = new FileOutputStream(filePath + File.separator
-                            + fileName);
+                    FileOutputStream fileOut = new FileOutputStream(filePath);
                     wb.write(fileOut);
+                    wb.close();
                 } catch (FileNotFoundException e) {
                     e.printStackTrace();
                 } catch (IOException e) {
@@ -903,11 +917,20 @@ public class CalculateProxy {
                 count = 0;
             }
         }
-        try {
-            wb.close();
-        } catch (IOException e) {
-            e.printStackTrace();
+//        try {
+//            wb.close();  
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
+    }
+
+    private int getNum(ResultScanner scanner) {
+        int i=0;
+        
+        for (Result res : scanner) {
+            i++;
         }
+        return i;
     }
 
     private void outputCsvFile(StlBillData stlBillData, String exportPath, ResultScanner scanner) {

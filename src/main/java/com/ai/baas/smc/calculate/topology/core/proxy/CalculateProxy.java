@@ -863,6 +863,7 @@ public class CalculateProxy {
         Boolean flag = false;
 
         int num = resultList.size();
+        System.out.println("从hbase中的详单表取到的数据的数量为：" + num);
         for (NavigableMap<byte[], byte[]> map : resultList) {
             if ((++countAll) == num) {
                 flag = true;

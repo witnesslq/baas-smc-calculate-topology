@@ -886,18 +886,29 @@ public class CalculateProxy {
                 sheet = (XSSFSheet) wb.createSheet("详单");
             }
             if (count == 0) {
-                XSSFRow row0 = sheet.createRow(count);// 第n行
+
+                XSSFRow row0 = sheet.createRow(count);// 第一行
+                XSSFCell cell0 = row0.createCell(0);
+                cell0.setCellValue("批次号");
+                cell0 = row0.createCell(1);
+                cell0.setCellValue(stlBillData.getBatchNo());
+                cell0 = row0.createCell(2);
+                cell0.setCellValue("总记录数");
+                cell0 = row0.createCell(3);
+                cell0.setCellValue(originalNum);
+
                 XSSFRow row1 = sheet.createRow(count + 1);// 第n行
+                XSSFRow row2 = sheet.createRow(count + 2);// 第n行
                 for (int i = 0; i < columnNames.size(); i++) {
-                    XSSFCell cell = row0.createCell(i);
+                    XSSFCell cell = row1.createCell(i);
                     cell.setCellValue(columnNames.get(i));
                 }
                 for (int j = 0; j < columnValues.size(); j++) {
-                    XSSFCell cell = row1.createCell(j);
+                    XSSFCell cell = row2.createCell(j);
                     cell.setCellValue(columnValues.get(j));
                 }
             } else {
-                XSSFRow rown = sheet.createRow(count + 1);// 第n行
+                XSSFRow rown = sheet.createRow(count + 2);// 第n行
                 for (int i = 0; i < columnValues.size(); i++) {
                     XSSFCell cell = rown.createCell(i);
                     cell.setCellValue(columnValues.get(i));

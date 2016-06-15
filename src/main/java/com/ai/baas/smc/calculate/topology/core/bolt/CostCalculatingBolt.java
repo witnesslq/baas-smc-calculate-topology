@@ -28,7 +28,9 @@ import com.ai.baas.storm.message.MappingRule;
 import com.ai.baas.storm.message.MessageParser;
 import com.ai.baas.storm.util.BaseConstants;
 import com.ai.baas.storm.util.HBaseProxy;
+import com.ai.opt.base.exception.BusinessException;
 import com.ai.opt.sdk.components.mcs.MCSClientFactory;
+import com.ai.opt.sdk.util.CollectionUtil;
 import com.ai.paas.ipaas.mcs.interfaces.ICacheClient;
 import com.google.common.base.Joiner;
 
@@ -82,6 +84,10 @@ public class CostCalculatingBolt extends BaseBasicBolt {
             tenantId = data.get(BaseConstants.TENANT_ID);
             objectId = StringUtils.upperCase(input.getStringByField("objectId"));
             List<StlPolicy> policyList = calculateProxy.getPolicyList(objectId, tenantId);
+            if (CollectionUtil.isEmpty(policyList)) {
+                throw new BusinessException(SmcExceptCodeConstant.BUSINESS_EXCEPTION, "[租户:"
+                        + tenantId + ", 数据对象:" + objectId + "]未匹配到政策");
+            }
             // 处理政策
             for (StlPolicy stlPolicy : policyList) {
                 long elementId = stlPolicy.getStlElementId();
@@ -91,6 +97,10 @@ public class CostCalculatingBolt extends BaseBasicBolt {
                 String elementSn = stlPolicy.getStlElementSn();
                 List<StlPolicyItem> policyItemList = calculateProxy.getStlPolicyItemLists(policyId,
                         tenantId);
+                if (CollectionUtil.isEmpty(policyItemList)) {
+                    throw new BusinessException(SmcExceptCodeConstant.BUSINESS_EXCEPTION,
+                            "获取政策项为空[租户:" + tenantId + ", 政策ID:" + policyId + "]");
+                }
                 // 处理政策结算项
                 for (StlPolicyItem stlPolicyItem : policyItemList) {
                     Long itemId = stlPolicyItem.getItemId();
@@ -146,8 +156,12 @@ public class CostCalculatingBolt extends BaseBasicBolt {
                 calculateProxy.insertBillData(period, bsn, original);
                 System.out.println("row===" + rowKey_print + ",bill_id=" + billId_print);
             }
+        } catch (BusinessException e) {
+            LOG.error("算费bolt出现业务异常", e);
+            FailBillHandler.addFailBillMsg(data, SmcConstants.SIMPLE_BOLT, e.getErrorCode(),
+                    e.getErrorMessage());
         } catch (Exception e) {
-            LOG.error("算费bolt出现异常", e);
+            LOG.error("算费bolt出现系统异常", e);
             FailBillHandler.addFailBillMsg(data, SmcConstants.SIMPLE_BOLT,
                     SmcExceptCodeConstant.SYSTEM_EXCEPTION, e.getMessage());
         }

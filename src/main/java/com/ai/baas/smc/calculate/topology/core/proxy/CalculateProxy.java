@@ -660,7 +660,7 @@ public class CalculateProxy {
         return statement.executeUpdate(strSql.toString());
     }
 
-    public void exportFileAndFtp(String bsn, String original) {
+    public void exportFileAndFtp(String bsn, String original) throws Exception {
         ICacheClient billClient = MCSClientFactory
                 .getCacheClient(SmcCacheConstant.NameSpace.BILL_CACHE);
         Map<String, String> billAll = billClient.hgetAll(SmcCacheConstant.Cache.BILL_PREFIX + bsn);
@@ -674,13 +674,9 @@ public class CalculateProxy {
             stlBillData = JSON.parseObject(entry.getValue(), StlBillData.class);
             tenantId = stlBillData.getTenantId();
             batchNo = stlBillData.getBatchNo();
-            try {
-                exportPath = exportExcel(stlBillData, policyId, bsn, billClient);
-                exportCsv(stlBillData, policyId, exportPath, original);
-                // 不用政策Id导出，用账单ID作为导出id
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+            exportPath = exportExcel(stlBillData, policyId, bsn, billClient);
+            exportCsv(stlBillData, policyId, exportPath, original);
+            // 不用政策Id导出，用账单ID作为导出id
         }
         String zipFilePath = createZipFile(batchNo);
         System.out.println("压缩文件生成本地路径--->>>" + zipFilePath);

@@ -19,5 +19,6 @@ public class SmcConstants {
 	public static final String PAAS_CCS_SERVICEPASSWORD = "paas.ccs.servicepassword";
 	
 	public static final String CHARSET_GBK = "GBK";
+    public static final String SIMPLE_BOLT = "calculate_bolt";
 	
 }

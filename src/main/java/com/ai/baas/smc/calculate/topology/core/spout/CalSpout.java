@@ -60,6 +60,12 @@ public class CalSpout extends BaseRichSpout {
         String finishlist = cacheStatsTimes.hget(SmcCacheConstant.NameSpace.STATS_TIMES,
                 SmcCacheConstant.Cache.finishKey);
         if (StringUtils.isBlank(finishlist)) {
+            Thread.currentThread();
+            try {
+                Thread.sleep(3000L);
+            } catch (InterruptedException e) {
+                LOG.error("CalSpout error", e);
+            }
             return;
         }
         List<FinishListVo> voList = JSON.parseArray(finishlist, FinishListVo.class);

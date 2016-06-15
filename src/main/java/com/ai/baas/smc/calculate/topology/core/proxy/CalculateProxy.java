@@ -88,9 +88,7 @@ import com.mysql.jdbc.Statement;
 public class CalculateProxy {
     private static final Logger log = LoggerFactory.getLogger(CalculateProxy.class);
 
-    private String detail_bill_prefix = "stl_bill_detail_data_";
-
-    private String detail_bill_cf = "col_def";
+    private String STL_BILL_DETAIL_DATA_ = "stl_bill_detail_data_";
 
     private String exportLocal = "~/export";
 
@@ -503,20 +501,17 @@ public class CalculateProxy {
         return key.toString();
     }
 
-    public void outputDetailBill(String period, String row, Map<String, String> data) {
-        try {
-            TableName tableName = TableName.valueOf(detail_bill_prefix + period);
-            Table table = HBaseProxy.getConnection().getTable(tableName);
-            Put put = new Put(Bytes.toBytes(row));
-            byte[] cf = Bytes.toBytes(detail_bill_cf);
-            for (Entry<String, String> entry : data.entrySet()) {
-                put.addColumn(cf, Bytes.toBytes(entry.getKey()), Bytes.toBytes(entry.getValue()));
-            }
-            table.put(put);
-            table.close();
-        } catch (IOException e) {
-            e.printStackTrace();
+    public void outputDetailBill(String yyyymm, String row, Map<String, String> data)
+            throws IOException {
+        TableName tableName = TableName.valueOf(STL_BILL_DETAIL_DATA_ + yyyymm);
+        Table table = HBaseProxy.getConnection().getTable(tableName);
+        Put put = new Put(Bytes.toBytes(row));
+        byte[] cf = Bytes.toBytes(COLUMN_DEF);
+        for (Entry<String, String> entry : data.entrySet()) {
+            put.addColumn(cf, Bytes.toBytes(entry.getKey()), Bytes.toBytes(entry.getValue()));
         }
+        table.put(put);
+        table.close();
     }
 
     public long getBillDataId(String policyCode) {
@@ -822,7 +817,7 @@ public class CalculateProxy {
     public String exportCsv(StlBillData stlBillData, String policyId, String exportPath,
             String original) {
         String period = stlBillData.getBillTimeSn();
-        TableName tableName = TableName.valueOf(detail_bill_prefix + period);
+        TableName tableName = TableName.valueOf(STL_BILL_DETAIL_DATA_ + period);
         Table table = null;
         ResultScanner scanner = null;
         try {

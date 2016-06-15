@@ -13,6 +13,7 @@ import backtype.storm.topology.OutputFieldsDeclarer;
 import backtype.storm.topology.base.BaseBasicBolt;
 import backtype.storm.tuple.Tuple;
 
+import com.ai.baas.smc.calculate.topology.constants.SmcExceptCodeConstant;
 import com.ai.baas.smc.calculate.topology.core.bo.StlPolicy;
 import com.ai.baas.smc.calculate.topology.core.bo.StlPolicyItem;
 import com.ai.baas.smc.calculate.topology.core.bo.StlPolicyItemCondition;
@@ -20,6 +21,8 @@ import com.ai.baas.smc.calculate.topology.core.bo.StlPolicyItemPlan;
 import com.ai.baas.smc.calculate.topology.core.proxy.CalculateProxy;
 import com.ai.baas.smc.calculate.topology.core.util.LoadConfUtil;
 import com.ai.baas.smc.calculate.topology.core.util.SmcCacheConstant;
+import com.ai.baas.smc.calculate.topology.core.util.SmcConstants;
+import com.ai.baas.storm.failbill.FailBillHandler;
 import com.ai.baas.storm.jdbc.JdbcProxy;
 import com.ai.baas.storm.message.MappingRule;
 import com.ai.baas.storm.message.MessageParser;
@@ -67,7 +70,7 @@ public class CostCalculatingBolt extends BaseBasicBolt {
         String billId_print = "";
         try {
             String inputData = input.getStringByField("line");
-            // System.out.println("input===" + inputData);
+            LOG.info("算费bolt接收数据 input = " + inputData);
             MessageParser messageParser = MessageParser.parseObject(inputData, mappingRules,
                     outputFields);
             data = messageParser.getData();
@@ -141,11 +144,12 @@ public class CostCalculatingBolt extends BaseBasicBolt {
                     SmcCacheConstant.Cache.lockKey, bsn));
             if (original.equals(counter)) {
                 calculateProxy.insertBillData(period, bsn, original);
-                System.out.println("需要插入账单表喽。。。");
                 System.out.println("row===" + rowKey_print + ",bill_id=" + billId_print);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            LOG.error("算费bolt出现异常", e);
+            FailBillHandler.addFailBillMsg(data, SmcConstants.SIMPLE_BOLT,
+                    SmcExceptCodeConstant.SYSTEM_EXCEPTION, e.getMessage());
         }
     }
 

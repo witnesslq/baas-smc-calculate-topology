@@ -60,6 +60,7 @@ public class CalSpout extends BaseRichSpout {
         String finishlist = cacheStatsTimes.hget(SmcCacheConstant.NameSpace.STATS_TIMES,
                 SmcCacheConstant.Cache.finishKey);
         if (StringUtils.isBlank(finishlist)) {
+            LOG.info("未获取到数据，休息3s...");
             Thread.currentThread();
             try {
                 Thread.sleep(3000L);

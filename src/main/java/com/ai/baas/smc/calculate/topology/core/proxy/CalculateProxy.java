@@ -19,13 +19,11 @@ import java.util.NavigableMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-import org.apache.commons.io.Charsets;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.ObjectUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.time.DateFormatUtils;
-import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
@@ -50,6 +48,7 @@ import org.wltea.expression.ExpressionEvaluator;
 import org.wltea.expression.datameta.Variable;
 
 import com.ai.baas.smc.api.policymanage.param.StepCalValue;
+import com.ai.baas.smc.calculate.topology.constants.SmcExceptCodeConstant;
 import com.ai.baas.smc.calculate.topology.core.bo.StlBillData;
 import com.ai.baas.smc.calculate.topology.core.bo.StlBillItemData;
 import com.ai.baas.smc.calculate.topology.core.bo.StlElement;
@@ -74,11 +73,12 @@ import com.ai.baas.storm.sequence.datasource.SeqDataSourceLoader;
 import com.ai.baas.storm.sequence.util.SeqUtil;
 import com.ai.baas.storm.util.BaseConstants;
 import com.ai.baas.storm.util.HBaseProxy;
+import com.ai.opt.base.exception.BusinessException;
 import com.ai.opt.sdk.components.mcs.MCSClientFactory;
 import com.ai.paas.ipaas.mcs.interfaces.ICacheClient;
 import com.alibaba.fastjson.JSON;
+import com.esotericsoftware.minlog.Log;
 import com.google.common.base.Joiner;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -241,18 +241,20 @@ public class CalculateProxy {
             elementStr.append(stlPolicyItemCondition.getTenantId());
             elementStr.append(".");
             elementStr.append(String.valueOf(stlPolicyItemCondition.getElementId()));
-            // String compare =(String)data.get("content");
             String elementJson = elementcacheClient.hget(SmcCacheConstant.NameSpace.ELEMENT_CACHE,
                     elementStr.toString());
             if (StringUtils.isBlank(elementJson)) {
-                break;
+                throw new BusinessException(SmcExceptCodeConstant.BUSINESS_EXCEPTION, "元素信息不存在[租户:"
+                        + stlPolicyItemCondition.getTenantId() + ", 元素ID:"
+                        + stlPolicyItemCondition.getElementId() + "]");
             }
             StlElement stlElement = JSON.parseObject(elementJson, StlElement.class);
+            String elementCode = stlElement.getElementCode();
             String compare = "";
             if (stlElement.getAttrType().equalsIgnoreCase(SmcConstants.STL_ELEMENT_ATTR_TYPE_STAT)) {
                 if (stlElement.getStatisticsType().equalsIgnoreCase(
                         SmcConstants.STL_ELEMENT_STAT_TYPE_C_CNT)) {
-                    int len = StringUtils.defaultString(data.get("content")).length();
+                    int len = StringUtils.defaultString(data.get(elementCode)).length();
                     compare = String.valueOf(len);
                 } else {
                     System.out.println("内存中目前没有统计数据，敬请期待。。。");
@@ -260,7 +262,6 @@ public class CalculateProxy {
                     continue;
                 }
             } else {
-                String elementCode = stlElement.getElementCode();
                 compare = data.get(elementCode);
             }
 
@@ -293,20 +294,6 @@ public class CalculateProxy {
         return flag;
     }
 
-    // public Map valueMap(String[] stream, List paramList) {
-    // Map map = new HashMap();
-    // for (int i = 0; i < stream.length; i++) {
-    // for (int j = 0; j < paramList.size(); j++) {
-    // Map paramMap = (Map) paramList.get(j);
-    // if (paramMap.containsKey(i)) {
-    // map.put(paramMap.get(i), stream[i]);
-    // }
-    // }
-    // }
-    // return map;
-    //
-    // }
-
     public double caculateFees(StlPolicyItemPlan stlPolicyItemPlan, Map<String, String> data) {
         double value = docaculate(stlPolicyItemPlan, data);
         data.put("item_fee", String.valueOf(value));
@@ -336,21 +323,25 @@ public class CalculateProxy {
 
         String elementJson = elementcacheClient.hget(SmcCacheConstant.NameSpace.ELEMENT_CACHE,
                 elementStr.toString());
+        if (StringUtils.isBlank(elementJson)) {
+            throw new BusinessException(SmcExceptCodeConstant.BUSINESS_EXCEPTION, "元素信息不存在[租户:"
+                    + policyDetailQueryPlanInfo.getTenantId() + ", 元素ID:" + elementId + "]");
+        }
         StlElement stlElement = JSON.parseObject(elementJson, StlElement.class);
+        String elementCode = stlElement.getElementCode();
         // long sortId = stlElement.getSortId();
         // int num = (int) sortId;
         String compare = "";
         if (stlElement.getAttrType().equalsIgnoreCase(SmcConstants.STL_ELEMENT_ATTR_TYPE_STAT)) {
             if (stlElement.getStatisticsType().equalsIgnoreCase(
                     SmcConstants.STL_ELEMENT_STAT_TYPE_C_CNT)) {
-                int len = StringUtils.defaultString(data.get("content")).length();
+                int len = StringUtils.defaultString(data.get(elementCode)).length();
                 compare = String.valueOf(len);
             } else {
                 System.out.println("内存中目前没有统计数据，敬请期待。。。");
                 return value;
             }
         } else {
-            String elementCode = stlElement.getElementCode();
             compare = data.get(elementCode);
         }
         // compare =(String)data.get("content");
@@ -541,7 +532,6 @@ public class CalculateProxy {
             if (insert(stlBillData, period, entry.getKey(), bsn, billClient)) {
                 opt_times++;
             }
-            // opt_times = 1;
         }
         if (billMaps.size() == opt_times) {
             // 导出文件
@@ -557,7 +547,7 @@ public class CalculateProxy {
     }
 
     public boolean insert(StlBillData stlBillData, String period, String policyId, String bsn,
-            ICacheClient client) {
+            ICacheClient client) throws Exception {
         Connection conn = null;
         boolean isSucc = false;
         try {
@@ -583,14 +573,15 @@ public class CalculateProxy {
             conn.commit();
             isSucc = true;
         } catch (Exception e) {
-            e.printStackTrace();
+            Log.error("error", e);
             if (conn != null) {
                 try {
                     conn.rollback();
                 } catch (SQLException e1) {
-                    e1.printStackTrace();
+                    Log.error("error", e);
                 }
             }
+            throw e;
         }
         return isSucc;
     }
@@ -846,11 +837,10 @@ public class CalculateProxy {
     }
 
     private void outputExcelFile(StlBillData stlBillData, String exportPath, ResultScanner scanner,
-            String original) {
+            String original) throws IOException {
         int count = 0;
         int fileCount = 1;
         int countAll = 0;
-        int originalNum = Integer.parseInt(original);
         List<NavigableMap<byte[], byte[]>> resultList = getMap(scanner);
         String qualifierName = "", colunmValue = "";
         List<String> columnNames = new ArrayList<String>();
@@ -892,7 +882,7 @@ public class CalculateProxy {
                 cell0 = row0.createCell(2);
                 cell0.setCellValue("总记录数");
                 cell0 = row0.createCell(3);
-                cell0.setCellValue(originalNum);
+                cell0.setCellValue(num);
 
                 XSSFRow row1 = sheet.createRow(count + 1);// 第n行
                 XSSFRow row2 = sheet.createRow(count + 2);// 第n行
@@ -919,23 +909,12 @@ public class CalculateProxy {
                                 stlBillData.getPolicyCode(), stlBillData.getBillTimeSn(), "详单",
                                 fileCount).concat(".xlsx");
                 String filePath = Joiner.on(File.separator).join(exportPath, fileName);
-                try {
-                    FileOutputStream fileOut = new FileOutputStream(filePath);
-                    wb.write(fileOut);
-                    wb.close();
-                } catch (FileNotFoundException e) {
-                    e.printStackTrace();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+                FileOutputStream fileOut = new FileOutputStream(filePath);
+                wb.write(fileOut);
+                wb.close();
                 fileCount++;
                 count = 0;
             }
-        }
-        try {
-            wb.close();
-        } catch (IOException e) {
-            e.printStackTrace();
         }
     }
 
@@ -949,75 +928,6 @@ public class CalculateProxy {
         }
         return result;
     }
-
-    private void outputCsvFile(StlBillData stlBillData, String exportPath, ResultScanner scanner) {
-        int count = 1;
-        int fileCount = 1;
-        List<String> columnNames = Lists.newArrayList();
-        List<String> columnValues;
-        BufferedOutputStream buffer = null;
-        String qualifierName = "", colunmValue = "";
-        try {
-            // buffer = new BufferedOutputStream(new FileOutputStream(filePath,true));
-            for (Result res : scanner) {
-                if (count == 1) {
-                    buffer = createCsvFileStream(stlBillData, exportPath, fileCount);
-                    fileCount++;
-                }
-                columnValues = Lists.newArrayList();
-                for (KeyValue kv : res.raw()) {
-                    // System.out.println(Bytes.toString(kv.getQualifier())+"="+Bytes.toString(kv.getValue()));
-                    qualifierName = Bytes.toString(kv.getQualifier());
-                    if (count == 1) {
-                        columnNames.add(qualifierName);
-                    }
-                    colunmValue = Bytes.toString(kv.getValue());
-                    columnValues.add(!qualifierName.equalsIgnoreCase("item_fee") ? colunmValue
-                            : formatUnit(colunmValue));
-                }
-                if (count == 1) {
-                    System.out.println(Joiner.on(",").join(columnNames));
-                    IOUtils.write(Joiner.on(",").join(columnNames).concat(IOUtils.LINE_SEPARATOR),
-                            buffer, Charsets.UTF_8);
-                }
-                IOUtils.write(Joiner.on(",").join(columnValues).concat(IOUtils.LINE_SEPARATOR),
-                        buffer, SmcConstants.CHARSET_GBK);
-                buffer.flush();
-                count++;
-                if (count > export_max) {
-                    count = 1;
-                    columnNames = Lists.newArrayList();
-                    IOUtils.closeQuietly(buffer);
-                }
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            IOUtils.closeQuietly(buffer);
-        }
-    }
-
-    private BufferedOutputStream createCsvFileStream(StlBillData stlBillData, String exportPath,
-            int fileCount) throws FileNotFoundException {
-        String fileName = Joiner
-                .on(BaseConstants.COMMON_JOINER)
-                .join(stlBillData.getTenantId(), stlBillData.getStlElementSn(),
-                        stlBillData.getPolicyCode(), stlBillData.getBillTimeSn(), "详单", fileCount)
-                .concat(".csv");
-        String filePath = Joiner.on(File.separator).join(exportPath, fileName);
-        return new BufferedOutputStream(new FileOutputStream(filePath, true));
-    }
-
-    // private String createCsvFile(StlBillData stlBillData,String exportPath) throws IOException{
-    // String fileName = Joiner
-    // .on(BaseConstants.COMMON_JOINER)
-    // .join(stlBillData.getTenantId(), stlBillData.getPolicyCode(),
-    // stlBillData.getBillTimeSn()).concat(".csv");
-    //
-    // String filePath = Joiner.on(File.separator).join(exportPath, fileName);
-    // //FileUtils.forceMkdir(FileUtils.getFile(exportPath));
-    // return filePath;
-    // }
 
     public String exportExcel(StlBillData stlBillData, String policyId, String bsn,
             ICacheClient billClient) throws Exception {
@@ -1131,7 +1041,7 @@ public class CalculateProxy {
 
         FileOutputStream fileOut = new FileOutputStream(local + File.separator + fileName);
         wb.write(fileOut);
-
+        wb.close();
         return local.toString();
     }
 

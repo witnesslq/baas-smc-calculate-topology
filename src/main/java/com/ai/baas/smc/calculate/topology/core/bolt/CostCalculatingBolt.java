@@ -89,6 +89,8 @@ public class CostCalculatingBolt extends BaseBasicBolt {
                         + tenantId + ", 数据对象:" + objectId + "]未匹配到政策");
             }
             // 处理政策
+            data.put("item_fee", "0");
+            data.put("fee_item_id", "0");
             for (StlPolicy stlPolicy : policyList) {
                 long elementId = stlPolicy.getStlElementId();
                 String stlObjectId = stlPolicy.getStlObjectId();
@@ -111,37 +113,38 @@ public class CostCalculatingBolt extends BaseBasicBolt {
                     // 匹配政策适配对象
                     if (calculateProxy.matchPolicy(data, stlPolicyItemConditionList)) {
                         for (StlPolicyItemPlan stlPolicyItemPlan : stlPolicyItemPlanList) {
+                            // 计算费用
                             value = calculateProxy.caculateFees(stlPolicyItemPlan, data);
-                            // data.put("fee", String.valueOf(value));
                             String billDataId = calculateProxy.dealBill(stlPolicy.getPolicyCode(),
                                     value, tenantId, batchNo, stlObjectId, elementId, billStyleSn,
                                     period, stlPolicyItemPlan.getFeeItem(), policyId.toString(),
                                     elementSn, bsn);
-                            String order_id = data.get("order_id");
-                            String[] family = new String[] { "data" };
-                            // long billDataId =
-                            // calculateProxy.getBillDataId(stlPolicy.getPolicyCode());
-
-                            // 行键
-                            // 租户ID_账单ID_账期ID_数据对象_账单来源_流水ID
-                            String row = Joiner.on(BaseConstants.COMMON_JOINER).join(tenantId,
-                                    billDataId, period, objectId, source, order_id);
-
-                            rowKey_print = row;
-                            billId_print = billDataId;
-                            // System.out.println("row===" + row+",bill_id="+billDataId);
                             data.put("bill_id", billDataId);
-                            data.put("object_id", objectId);
-                            data.put("bill_from", "sys");
-
-                            data.put("stl_order_data_key", Joiner.on(BaseConstants.COMMON_JOINER)
-                                    .join(tenantId, batchNo, objectId, order_id));
-                            calculateProxy.outputDetailBill(period, row, data);
-                            // System.out.println("bill_id="+billDataId);
                         }
                     }
                 }
             }
+
+            String order_id = data.get("order_id");
+
+            String billDataId = data.get("bill_id");
+            // 行键
+            // 租户ID_账单ID_账期ID_数据对象_账单来源_流水ID
+            String row = Joiner.on(BaseConstants.COMMON_JOINER).join(tenantId, billDataId, period,
+                    objectId, source, order_id);
+
+            rowKey_print = row;
+            billId_print = billDataId;
+            // System.out.println("row===" + row+",bill_id="+billDataId);
+
+            data.put("object_id", objectId);
+            data.put("bill_from", "sys");
+
+            data.put(
+                    "stl_order_data_key",
+                    Joiner.on(BaseConstants.COMMON_JOINER).join(tenantId, batchNo, objectId,
+                            order_id));
+            calculateProxy.outputDetailBill(period, row, data);
             /**
              * 更新计数器
              */
@@ -150,6 +153,8 @@ public class CostCalculatingBolt extends BaseBasicBolt {
                     .getCacheClient(SmcCacheConstant.NameSpace.CAL_COMMON_CACHE);
             String counter = String.valueOf(cacheClient.hincrBy(SmcCacheConstant.Cache.COUNTER,
                     bsn, 1));
+            LOG.info("详单算费累加器[key1:" + SmcCacheConstant.Cache.COUNTER + ", key2:" + bsn
+                    + ", value = " + counter + "]");
             String original = StringUtils.defaultString(cacheClient.hget(
                     SmcCacheConstant.Cache.lockKey, bsn));
             if (original.equals(counter)) {

@@ -3,7 +3,6 @@ package com.ai.baas.smc.calculate.topology.core.proxy;
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -713,25 +712,22 @@ public class CalculateProxy {
         return isSucc;
     }
 
-    private boolean uploadFile(String tenantId, String zipFilePath, ICacheClient billClient) {
+    private boolean uploadFile(String tenantId, String zipFilePath, ICacheClient billClient)
+            throws Exception {
         boolean isSucc = false;
-        try {
-            Map<String, String> sftpCfg = getSftpConfig(tenantId);
-            if (!verifySftpConfigParam(sftpCfg)) {
-                throw new Exception("读取上传SFTP参数失败:" + sftpCfg.toString());
-            }
-            System.out.println("sftp config=" + sftpCfg.toString());
-            SftpUtil sftpUtil = new SftpUtil(sftpCfg.get("user"), sftpCfg.get("pwd"),
-                    sftpCfg.get("host"), "");
-            sftpUtil.connect();
-            sftpUtil.uploadFile(zipFilePath, sftpCfg.get("remote"));
-            sftpUtil.disconnect();
-            log.debug("上传数据完成!");
-            isSucc = true;
-        } catch (Exception e) {
-            e.printStackTrace();
-            log.error("上传文件失败,原因[" + e.getMessage() + "]");
+        Map<String, String> sftpCfg = getSftpConfig(tenantId);
+        if (!verifySftpConfigParam(sftpCfg)) {
+            throw new BusinessException(SmcExceptCodeConstant.BUSINESS_EXCEPTION, "读取上传SFTP参数失败:"
+                    + sftpCfg.toString());
         }
+        System.out.println("sftp config=" + sftpCfg.toString());
+        SftpUtil sftpUtil = new SftpUtil(sftpCfg.get("user"), sftpCfg.get("pwd"),
+                sftpCfg.get("host"), "");
+        sftpUtil.connect();
+        sftpUtil.uploadFile(zipFilePath, sftpCfg.get("remote"));
+        sftpUtil.disconnect();
+        log.debug("上传数据完成!");
+        isSucc = true;
         return isSucc;
     }
 
@@ -774,63 +770,40 @@ public class CalculateProxy {
         return JSON.parseArray(data, StlSysParam.class).get(0);
     }
 
-    // private StlSysParam getSysParamCache(String tenantId,String typeCode,String paramCode,String
-    // columnValue,ICacheClient client){
-    // String sysParamKey = Joiner.on(".").join(tenantId, typeCode, paramCode, columnValue);
-    // String data = client.get(sysParamKey);
-    // if(StringUtils.isBlank(data)){
-    // return null;
-    // }
-    // return JSON.parseArray(data, StlSysParam.class).get(0);
-    // }
-
-    private String createZipFile(String bsn) {
+    private String createZipFile(String bsn) throws IOException {
         String zipFilePath = Joiner.on(File.separator).join(exportLocal, bsn);
         String zipFileName = zipFilePath.concat(".zip");
         FileOutputStream outputStream;
         ZipOutputStream out = null;
-        try {
-            outputStream = new FileOutputStream(zipFileName);
-            out = new ZipOutputStream(new BufferedOutputStream(outputStream));
-            createCompressedFile(out, FileUtils.getFile(zipFilePath), "");
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            IOUtils.closeQuietly(out);
-        }
+        outputStream = new FileOutputStream(zipFileName);
+        out = new ZipOutputStream(new BufferedOutputStream(outputStream));
+        createCompressedFile(out, FileUtils.getFile(zipFilePath), "");
+        IOUtils.closeQuietly(out);
         return zipFileName;
     }
 
     public String exportCsv(StlBillData stlBillData, String policyId, String exportPath,
-            String original) {
+            String original) throws IOException {
         String period = stlBillData.getBillTimeSn();
         TableName tableName = TableName.valueOf(STL_BILL_DETAIL_DATA_ + period);
         Table table = null;
         ResultScanner scanner = null;
-        try {
-            // String filePath = createCsvFile(stlBillData,exportPath);
-            String rowKeyPrefix = Joiner.on(BaseConstants.COMMON_JOINER).join(
-                    stlBillData.getTenantId(), stlBillData.getBillId().toString(), period);
-            table = HBaseProxy.getConnection().getTable(tableName);
-            Scan scan = new Scan();
-            scan.setCaching(300);
-            scan.setFilter(new RowFilter(CompareFilter.CompareOp.EQUAL, new SubstringComparator(
-                    rowKeyPrefix)));
-            scanner = table.getScanner(scan);
-            // outputCsvFile(stlBillData, exportPath, scanner);
-            outputExcelFile(stlBillData, exportPath, scanner, original);
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            if (scanner != null) {
-                scanner.close();
-            }
-            if (table != null) {
-                try {
-                    table.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+        String rowKeyPrefix = Joiner.on(BaseConstants.COMMON_JOINER).join(
+                stlBillData.getTenantId(), stlBillData.getBillId().toString(), period);
+        table = HBaseProxy.getConnection().getTable(tableName);
+        Scan scan = new Scan();
+        scan.setCaching(300);
+        scan.setFilter(new RowFilter(CompareFilter.CompareOp.EQUAL, new SubstringComparator(
+                rowKeyPrefix)));
+        scanner = table.getScanner(scan);
+        outputExcelFile(stlBillData, exportPath, scanner, original);
+        if (scanner != null) {
+            scanner.close();
+        }
+        if (table != null) {
+            try {
+                table.close();
+            } catch (IOException e) {
             }
         }
         return "";
@@ -1045,38 +1018,35 @@ public class CalculateProxy {
         return local.toString();
     }
 
-    private void createCompressedFile(ZipOutputStream out, File file, String dir) {
-        try {
-            // 如果当前的是文件夹，则进行进一步处理
-            if (file.isDirectory()) {
-                // 得到文件列表信息
-                File[] files = file.listFiles();
-                // 将文件夹添加到下一级打包目录
-                out.putNextEntry(new ZipEntry(dir + File.separator));
-                dir = dir.length() == 0 ? "" : dir + File.separator;
-                // 循环将文件夹中的文件打包
-                for (int i = 0; i < files.length; i++) {
-                    createCompressedFile(out, files[i], dir + files[i].getName()); // 递归处理
-                }
-            } else { // 当前的是文件，打包处理
-                // 文件输入流
-                FileInputStream fis = new FileInputStream(file);
-                out.putNextEntry(new ZipEntry(dir));
-                // 进行写操作
-                int j = 0;
-                byte[] buffer = new byte[1024];
-                while ((j = fis.read(buffer)) > 0) {
-                    out.write(buffer, 0, j);
-                }
-                // 关闭输入流
-                fis.close();
+    private void createCompressedFile(ZipOutputStream out, File file, String dir)
+            throws IOException {
+        // 如果当前的是文件夹，则进行进一步处理
+        if (file.isDirectory()) {
+            // 得到文件列表信息
+            File[] files = file.listFiles();
+            // 将文件夹添加到下一级打包目录
+            out.putNextEntry(new ZipEntry(dir + File.separator));
+            dir = dir.length() == 0 ? "" : dir + File.separator;
+            // 循环将文件夹中的文件打包
+            for (int i = 0; i < files.length; i++) {
+                createCompressedFile(out, files[i], dir + files[i].getName()); // 递归处理
             }
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        } finally {
-
+        } else { // 当前的是文件，打包处理
+            // 文件输入流
+            FileInputStream fis = new FileInputStream(file);
+            out.putNextEntry(new ZipEntry(dir));
+            // 进行写操作
+            int j = 0;
+            byte[] buffer = new byte[1024];
+            while ((j = fis.read(buffer)) > 0) {
+                out.write(buffer, 0, j);
+            }
+            // 关闭输入流
+            try {
+                fis.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 

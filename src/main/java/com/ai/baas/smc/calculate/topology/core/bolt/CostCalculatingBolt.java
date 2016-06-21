@@ -76,7 +76,7 @@ public class CostCalculatingBolt extends BaseBasicBolt {
             MessageParser messageParser = MessageParser.parseObject(inputData, mappingRules,
                     outputFields);
             data = messageParser.getData();
-            // System.out.println("data===" + data.toString());
+            LOG.info("算费bolt接收数据 data = " + data);
             batchNo = StringUtils.defaultString(data.get("batch_no"));
             bsn = data.get(BaseConstants.BATCH_SERIAL_NUMBER);
             period = StringUtils.substring(data.get(BaseConstants.ACCOUNT_PERIOD), 0, 6);

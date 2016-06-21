@@ -56,6 +56,7 @@ public class CostCalculatingBolt extends BaseBasicBolt {
                 BaseConstants.JDBC_DEFAULT);
         mappingRules[1] = mappingRules[0];
         calculateProxy = new CalculateProxy(stormConf);
+        FailBillHandler.startup();
     }
 
     @Override

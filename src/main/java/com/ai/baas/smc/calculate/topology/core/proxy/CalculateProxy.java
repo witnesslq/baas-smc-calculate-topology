@@ -210,19 +210,6 @@ public class CalculateProxy {
         return stlPolicyItemPlanList;
     }
 
-    // public List getParamList() {
-    // IDshmClient client = null;
-    // if (client == null)
-    // client = new DshmClient();
-    // ICacheClient cacheClient = CacheFactoryUtil.getCacheClient(CacheBLMapper.CACHE_BL_CAL_PARAM);
-    // Map<String, String> params = new TreeMap<String, String>();
-    // params.put("price_code", "999");
-    // params.put("tenant_id", "VIV-BYD");
-    // List<Map<String, String>> results =
-    // client.list("cp_price_info").where(params).executeQuery(cacheClient);
-    // return results;
-    // }
-
     /**
      * 是否匹配规则
      * 
@@ -465,23 +452,11 @@ public class CalculateProxy {
     boolean contains(List<StlBillItemData> itemDatas, String feeItemId, double value) {
         for (StlBillItemData stlBillItemData : itemDatas) {
             if (feeItemId.equals(stlBillItemData.getFeeItemId())) {
-                // double addup = stlBillItemData.getTotalFee().doubleValue() + value;
-                // stlBillItemData.setTotalFee(new Double(addup));
                 return true;
             }
         }
         return false;
     }
-
-    // boolean contains(String policyCode, List<StlBillData> dataList) {
-    // boolean flag = false;
-    // for (StlBillData stlBillData : dataList) {
-    // if (stlBillData.getPolicyCode().equals(policyCode)) {
-    // flag = true;
-    // }
-    // }
-    // return flag;
-    // }
 
     private String assembleCacheKey(String... params) {
         StringBuilder key = new StringBuilder();
